@@ -1,0 +1,20 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace SharpHound3.JSON
+{
+    internal class GPLink
+    {
+        private string _name;
+
+        public bool? IsEnforced { get; set; }
+        public string Name
+        {
+            get => _name;
+            set => _name = value.ToUpper();
+        }
+    }
+}
