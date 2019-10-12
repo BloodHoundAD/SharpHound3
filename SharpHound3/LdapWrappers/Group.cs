@@ -4,6 +4,7 @@ using System.DirectoryServices.Protocols;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SharpHound3.JSON;
 
 namespace SharpHound3.LdapWrappers
 {
@@ -12,5 +13,7 @@ namespace SharpHound3.LdapWrappers
         internal Group(SearchResultEntry entry) : base(entry)
         {
         }
+
+        public GroupMember[] Members { get; set; }
     }
 }

@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.DirectoryServices.ActiveDirectory;
+using System.DirectoryServices.Protocols;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -277,16 +278,61 @@ namespace SharpHound3
             }
         }
 
-        internal static bool DistinguishedNameToGuid(string dn, out string guid)
+
+        internal static bool DistinguishedNameToGuid(string distinguishedName, out string guid)
         {
-            if (AccountNameToSidCache.TryGetValue(dn, out guid))
+            if (AccountNameToSidCache.TryGetValue(distinguishedName, out guid))
                 return guid != null;
 
-            try
+            // Placeholder for options.DomainController set
+            if (false)
             {
-                var account = new NTAccount(dn);
-                var translated = account.Translate(typeof(Guid));
+
             }
+            else
+            {
+                return DistinguishedNameToGuidTranslateName(distinguishedName, out guid);
+            }
+        }
+
+        private static bool DistinguishedNameToGuidLdap(string dn, out string guid)
+        {
+            var domain = DistinguishedNameToDomain(dn);
+            var searcher = GetDirectorySearcher(domain);
+
+            var result = searcher.QueryLdap("(&)", new[] {"objectguid"}, SearchScope.Base, dn).DefaultIfEmpty(null).FirstOrDefault();
+            if (result == null)
+            {
+                guid = null;
+                return false;
+            }
+
+            var guidBytes = result.GetPropertyAsBytes("objectguid");
+            if (guidBytes == null)
+            {
+                guid = null;
+                return false;
+            }
+
+            guid = new Guid(guidBytes).ToString();
+            return true;
+        }
+
+        private static bool DistinguishedNameToGuidTranslateName(string dn, out string guid)
+        {
+            var translated = new StringBuilder(1024);
+            var nameSize = translated.Capacity;
+            var status = TranslateName(dn, EXTENDED_NAME_FORMAT.NameFullyQualifiedDN, EXTENDED_NAME_FORMAT.NameUniqueId,
+                translated, ref nameSize);
+
+            if (status != 0)
+            {
+                guid = translated.ToString();
+                return true;
+            }
+
+            guid = null;
+            return false;
         }
 
         internal static bool AccountNameToSid(string username, string domain, out string sid)
@@ -555,6 +601,64 @@ namespace SharpHound3
             public string ClientSiteName;
         }
 
+        #endregion
+
+        #region TranslateName
+
+        [DllImport("secur32.dll", SetLastError = true)]
+        private static extern int TranslateName(string accountName, EXTENDED_NAME_FORMAT accountNameFormat,
+            EXTENDED_NAME_FORMAT desiredFormat, StringBuilder translatedName, ref int userNameSize);
+
+        private enum EXTENDED_NAME_FORMAT : int
+        {
+            /// <summary>
+            /// Unknown Name Format
+            /// </summary>
+            NameUnknown = 0,
+            /// <summary>
+            /// DistinguishedName Format
+            /// CN=Jeff Smith,OU=Users,DC=Engineering,DC=Microsoft,DC=Com
+            /// </summary>
+            NameFullyQualifiedDN = 1,
+            NameSamCompatible = 2, //Engineering\JSmith
+            NameDisplay = 3, //Jeff Smith
+            /// <summary>
+            /// ObjectGUID
+            /// {4fa050f0-f561-11cf-bdd9-00aa003a77b6}
+            /// </summary>
+            NameUniqueId = 6,
+            NameCanonical = 7, //engineering.microsoft.com/software/someone
+            NameUserPrincipal = 8, //someone@example.com
+            NameCanonicalEx = 9, //engineering.microsoft.com/software\nJSmith
+            NameServicePrincipal = 10, //www/www.microsoft.com@microsoft.com
+            /// <summary>
+            /// DnsDomain Format
+            /// DOMAIN\SamAccountName
+            /// </summary>
+            NameDnsDomain = 12
+
+        }
+        #endregion
+
+        #region LookupAccountName
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool LookupAccountName(string systemName, string accountName,
+            [MarshalAs(UnmanagedType.LPArray)] byte[] Sid, ref uint sidLength, StringBuilder domainName,
+            ref uint domainNameLength, out SID_NAME_USE type);
+        
+        private enum SID_NAME_USE
+        {
+            SidTypeUser = 1,
+            SidTypeGroup,
+            SidTypeDomain,
+            SidTypeAlias,
+            SidTypeWellKnownGroup,
+            SidTypeDeletedAccount,
+            SidTypeInvalid,
+            SidTypeUnknown,
+            SidTypeComputer
+        }
         #endregion
     }
 }

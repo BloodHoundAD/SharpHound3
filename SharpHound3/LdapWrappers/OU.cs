@@ -17,7 +17,6 @@ namespace SharpHound3.LdapWrappers
 
         public string[] Users { get; set; }
         public string[] Computers { get; set; }
-
         public string[] ChildOus { get; set; }
     }
 }

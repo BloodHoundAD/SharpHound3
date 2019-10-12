@@ -62,11 +62,14 @@
   <ItemGroup>
     <Compile Include="CommonPrincipal.cs" />
     <Compile Include="Enums\UACFlags.cs" />
+    <Compile Include="Exceptions.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="Helpers.cs" />
     <Compile Include="JSON\ACL.cs" />
     <Compile Include="Enums\LdapTypeEnum.cs" />
+    <Compile Include="JSON\Cache.cs" />
     <Compile Include="JSON\GPLink.cs" />
+    <Compile Include="JSON\GroupMember.cs" />
     <Compile Include="LdapWrappers\Computer.cs" />
     <Compile Include="LdapWrappers\Domain.cs" />
     <Compile Include="LdapWrappers\GPO.cs" />
@@ -74,10 +77,11 @@
     <Compile Include="LdapWrappers\Group.cs" />
     <Compile Include="LdapWrappers\OU.cs" />
     <Compile Include="LdapWrappers\User.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="SharpHound.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="DirectorySearch.cs" />
     <Compile Include="Tasks\ContainerTasks.cs" />
+    <Compile Include="Tasks\GroupEnumerationTasks.cs" />
     <Compile Include="Tasks\ResolveTypeTask.cs" />
     <Compile Include="Tasks\LdapProducer.cs" />
     <Compile Include="Tasks\ObjectPropertyTasks.cs" />

@@ -10,7 +10,7 @@ using SharpHound3.Tasks;
 
 namespace SharpHound3
 {
-    class Program
+    class SharpHound
     {
         static void Main(string[] args)
         {
@@ -24,27 +24,34 @@ namespace SharpHound3
             var findTypeBlock = new TransformBlock<SearchResultEntry, LdapWrapper>(ResolveTypeTask.FindLdapType, new ExecutionDataflowBlockOptions
             {
                 MaxDegreeOfParallelism = 10,
-                BoundedCapacity = 5,
+                BoundedCapacity = 250,
             });
 
 
             var processDaclBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ACLTasks.ProcessDACL, new ExecutionDataflowBlockOptions
             {
                 MaxDegreeOfParallelism = 10,
-                BoundedCapacity = 5
+                BoundedCapacity = 250
             });
 
             var processPropertiesBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ObjectPropertyTasks.ResolveObjectProperties, new ExecutionDataflowBlockOptions
             {
-                MaxDegreeOfParallelism = 1,
-                BoundedCapacity = 5
+                MaxDegreeOfParallelism = 5,
+                BoundedCapacity = 250
+            });
+
+            var processContainerBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ContainerTasks.EnumerateContainer, new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 5,
+                BoundedCapacity = 250
             });
 
             findTypeBlock.LinkTo(processDaclBlock, linkOptions, wrapper => wrapper != null);
             findTypeBlock.LinkTo(DataflowBlock.NullTarget<LdapWrapper>(), (item) => (item == null));
             processDaclBlock.LinkTo(processPropertiesBlock, linkOptions);
             //processPropertiesBlock.LinkTo(new ActionBlock<LdapWrapper>(Console.WriteLine));
-            processPropertiesBlock.LinkTo(DataflowBlock.NullTarget<LdapWrapper>());
+            processPropertiesBlock.LinkTo(processContainerBlock, linkOptions);
+            processContainerBlock.LinkTo(DataflowBlock.NullTarget<LdapWrapper>());
             producer.StartProducer(findTypeBlock);
             processPropertiesBlock.Completion.Wait();
         }

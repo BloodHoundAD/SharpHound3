@@ -76,6 +76,113 @@ namespace SharpHound3
             }
         }
 
+        internal IEnumerable<string> RetrieveRangedAttribute(string distinguishedName, string attribute)
+        {
+            try
+            {
+                //Try ASQ first
+                return RangeRetrievalAsq(distinguishedName, attribute);
+            }
+            catch
+            {
+                try
+                {
+                    return RangeRetrievalFallback(distinguishedName, attribute);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Attempt to retrieve an LDAP attribute from a DN using an Attribute Scoped Query
+        /// </summary>
+        /// <param name="distinguishedName"></param>
+        /// <param name="attribute"></param>
+        /// <returns></returns>
+        private IEnumerable<string> RangeRetrievalAsq(string distinguishedName, string attribute)
+        {
+            using (var connection = GetLdapConnection())
+            {
+                var searchRequest = CreateSearchRequest("(&)", SearchScope.Base, null, distinguishedName);
+                var asq = new AsqRequestControl(attribute);
+                searchRequest.Controls.Add(asq);
+
+                var searchResponse = (SearchResponse) connection.SendRequest(searchRequest);
+
+                if (searchResponse.Controls.Length != 1 || !(searchResponse.Controls[0] is AsqResponseControl))
+                {
+                    //The domain controller doesn't support ASQ for some reason. So fall back to old fashioned LDAP retrieval.
+                    throw new ControlNotSupportedException();
+                }
+
+                //var asqResponse = (AsqResponseControl) searchResponse.Controls[0];
+
+                foreach (SearchResultEntry entry in searchResponse.Entries)
+                {
+                    yield return entry.DistinguishedName;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Attempt to retrieve a ranged LDAP attribute using old school ranged retrieval
+        /// </summary>
+        /// <param name="distinguishedName"></param>
+        /// <param name="attribute"></param>
+        /// <returns></returns>
+        private IEnumerable<string> RangeRetrievalFallback(string distinguishedName, string attribute)
+        {
+            var index = 0;
+            var step = 0;
+            var baseString = $"{attribute};";
+            var currentRange = $"{baseString};range={index}-*";
+
+            using (var connection = GetLdapConnection())
+            {
+                var searchRequest = CreateSearchRequest($"{attribute}=*", SearchScope.Base, new string[] { currentRange },
+                    distinguishedName);
+
+                var searchDone = false;
+
+                while (true)
+                {
+                    var response = (SearchResponse)connection.SendRequest(searchRequest);
+
+                    if (response?.Entries.Count == 1)
+                    {
+                        var entry = response.Entries[0];
+
+                        foreach (string attr in entry.Attributes.AttributeNames)
+                        {
+                            currentRange = attr;
+                            searchDone = currentRange.IndexOf("*", 0, StringComparison.Ordinal) > 0;
+                            step = entry.Attributes[currentRange].Count;
+                        }
+
+                        foreach (string member in entry.Attributes[currentRange].GetValues(typeof(string)))
+                        {
+                            yield return member;
+                            index++;
+                        }
+
+                        if (searchDone)
+                            yield break;
+
+                        currentRange = $"{baseString};range={index}-{index + step}";
+
+                        searchRequest.Attributes.Clear();
+                        searchRequest.Attributes.Add(currentRange);
+                    }
+                    else
+                        yield break;
+                }
+            }
+        }
+
         internal bool GetNameFromGuid(string guid, out string name)
         {
             return _domainGuidMap.TryGetValue(guid, out name);
@@ -137,7 +244,6 @@ namespace SharpHound3
             {
                 var name = result.GetProperty("name");
                 var guid = new Guid(result.GetPropertyAsBytes("schemaidguid")).ToString();
-                Console.WriteLine(guid);
                 map.Add(guid, name);
             }
 
