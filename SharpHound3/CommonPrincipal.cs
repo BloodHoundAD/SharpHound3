@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static SharpHound3.LdapTypeEnum;
+using SharpHound3.Enums;
+using static SharpHound3.Enums.LdapTypeEnum;
 
 namespace SharpHound3
 {

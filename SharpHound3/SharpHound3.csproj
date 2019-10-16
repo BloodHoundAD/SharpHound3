@@ -38,6 +38,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="CommandLine, Version=2.6.0.0, Culture=neutral, PublicKeyToken=5a870481e358d379, processorArchitecture=MSIL">
+      <HintPath>..\packages\CommandLineParser.2.6.0\lib\net45\CommandLine.dll</HintPath>
+    </Reference>
     <Reference Include="Costura, Version=4.1.0.0, Culture=neutral, PublicKeyToken=9919ef960d84173d, processorArchitecture=MSIL">
       <HintPath>..\packages\Costura.Fody.4.1.0\lib\net40\Costura.dll</HintPath>
     </Reference>
@@ -51,6 +54,7 @@
     <Reference Include="System.Core" />
     <Reference Include="System.DirectoryServices" />
     <Reference Include="System.DirectoryServices.Protocols" />
+    <Reference Include="System.Management" />
     <Reference Include="System.Threading.Tasks.Dataflow, Version=4.5.24.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Tpl.Dataflow.4.5.24\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
     </Reference>
@@ -60,6 +64,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cache.cs" />
+    <Compile Include="CollectionMethods.cs" />
     <Compile Include="CommonPrincipal.cs" />
     <Compile Include="Enums\UACFlags.cs" />
     <Compile Include="Exceptions.cs" />
@@ -67,7 +73,6 @@
     <Compile Include="Helpers.cs" />
     <Compile Include="JSON\ACL.cs" />
     <Compile Include="Enums\LdapTypeEnum.cs" />
-    <Compile Include="JSON\Cache.cs" />
     <Compile Include="JSON\GPLink.cs" />
     <Compile Include="JSON\GroupMember.cs" />
     <Compile Include="LdapWrappers\Computer.cs" />
@@ -82,6 +87,7 @@
     <Compile Include="DirectorySearch.cs" />
     <Compile Include="Tasks\ContainerTasks.cs" />
     <Compile Include="Tasks\GroupEnumerationTasks.cs" />
+    <Compile Include="Options.cs" />
     <Compile Include="Tasks\ResolveTypeTask.cs" />
     <Compile Include="Tasks\LdapProducer.cs" />
     <Compile Include="Tasks\ObjectPropertyTasks.cs" />

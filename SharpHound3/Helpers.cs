@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.DirectoryServices.ActiveDirectory;
 using System.DirectoryServices.Protocols;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -12,6 +13,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Heijden.DNS;
+using SharpHound3.Enums;
 
 namespace SharpHound3
 {
@@ -27,6 +29,9 @@ namespace SharpHound3
         private static readonly ConcurrentDictionary<string, string> DomainNetbiosMap = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, string> AccountNameToSidCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, Resolver> DNSResolverCache = new ConcurrentDictionary<string, Resolver>();
+
+        internal static readonly string[] ResolutionProps = {"samaccounttype", "objectsid", "objectguid", "objectclass"};
+
         private static readonly byte[] NameRequest = 
         {
             0x80, 0x94, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
@@ -38,6 +43,17 @@ namespace SharpHound3
             0x00, 0x01
         };
         private static Regex SPNRegex = new Regex(@".*\/.*", RegexOptions.Compiled);
+        private static readonly string ProcStartTime = $"{DateTime.Now:yyyyMMddHHmmss}";
+
+        internal static string ConvertSidToHexSid(string sid)
+        {
+            var securityIdentifier = new SecurityIdentifier(sid);
+            var sidBytes = new byte[securityIdentifier.BinaryLength];
+            securityIdentifier.GetBinaryForm(sidBytes, 0);
+
+            var output = $"\\{BitConverter.ToString(sidBytes).Replace('-', '\\')}";
+            return output;
+        }
 
         internal static string DistinguishedNameToDomain(string distinguishedName)
         {
@@ -284,15 +300,10 @@ namespace SharpHound3
             if (AccountNameToSidCache.TryGetValue(distinguishedName, out guid))
                 return guid != null;
 
-            // Placeholder for options.DomainController set
-            if (false)
-            {
+            if (Options.Instance.DomainController != null)
+                return DistinguishedNameToGuidLdap(distinguishedName, out guid);
 
-            }
-            else
-            {
-                return DistinguishedNameToGuidTranslateName(distinguishedName, out guid);
-            }
+            return DistinguishedNameToGuidTranslateName(distinguishedName, out guid);
         }
 
         private static bool DistinguishedNameToGuidLdap(string dn, out string guid)
@@ -300,7 +311,7 @@ namespace SharpHound3
             var domain = DistinguishedNameToDomain(dn);
             var searcher = GetDirectorySearcher(domain);
 
-            var result = searcher.QueryLdap("(&)", new[] {"objectguid"}, SearchScope.Base, dn).DefaultIfEmpty(null).FirstOrDefault();
+            var result = searcher.GetOne("(objectclass=*)", new[] {"objectguid"}, SearchScope.Base, dn);
             if (result == null)
             {
                 guid = null;
@@ -520,6 +531,36 @@ namespace SharpHound3
             
         }
 
+        internal static string ResolveFilepath(string filename, string extension, bool addTime)
+        {
+            var finalFilename = $"{filename}.{extension}";
+            if (extension == "json" && Options.Instance.RandomizeFilenames)
+            {
+                finalFilename = $"{Path.GetRandomFileName()}.{extension}";
+            }
+
+            if (addTime)
+            {
+                finalFilename = $"{ProcStartTime}_{finalFilename}";
+            }
+
+            if (Options.Instance.OutputPrefix != null)
+            {
+                finalFilename = $"{Options.Instance.OutputPrefix}_{finalFilename}";
+            }
+
+            var finalPath = Path.Combine(Options.Instance.OutputDirectory, finalFilename);
+
+            return finalPath;
+        }
+
+        internal static string Base64(string input)
+        {
+            var plainBytes = System.Text.Encoding.UTF8.GetBytes(input);
+            return Convert.ToBase64String(plainBytes);
+        }
+
+
         #region NetAPI PInvoke Calls
         [DllImport("netapi32.dll", SetLastError = true)]
         private static extern int NetWkstaGetInfo(
@@ -527,8 +568,10 @@ namespace SharpHound3
             uint level,
             out IntPtr bufPtr);
 
+        #pragma warning disable 649
         private struct WorkstationInfo100
         {
+
             public int platform_id;
             [MarshalAs(UnmanagedType.LPWStr)]
             public string computer_name;
@@ -537,6 +580,7 @@ namespace SharpHound3
             public int ver_major;
             public int ver_minor;
         }
+        #pragma warning restore 649
 
         [DllImport("Netapi32.dll", SetLastError = true)]
         private static extern int NetApiBufferFree(IntPtr Buffer);

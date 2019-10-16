@@ -5,6 +5,7 @@ using System.DirectoryServices.Protocols;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SharpHound3.Enums;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
 
@@ -12,10 +13,6 @@ namespace SharpHound3.Tasks
 {
     internal class ContainerTasks
     {
-        private static readonly string[] NeededProperties = {
-            "objectguid", "objectclass", "objectsid", "samaccounttype"
-        };
-
         internal static LdapWrapper EnumerateContainer(LdapWrapper wrapper)
         {
             if (wrapper is OU ou)
@@ -68,7 +65,7 @@ namespace SharpHound3.Tasks
 
             var searcher = Helpers.GetDirectorySearcher(domain.Domain);
             foreach (var containedObject in searcher.QueryLdap(
-                "(|(samAccountType=805306368)(samAccountType=805306369)(objectclass=organizationalUnit))", NeededProperties, SearchScope.OneLevel, domain.DistinguishedName))
+                "(|(samAccountType=805306368)(samAccountType=805306369)(objectclass=organizationalUnit))", Helpers.ResolutionProps, SearchScope.OneLevel, domain.DistinguishedName))
             { 
                 var type = containedObject.GetLdapType();
 
@@ -98,7 +95,7 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            foreach (var containedObject in searcher.QueryLdap("(objectclass=container)", NeededProperties,
+            foreach (var containedObject in searcher.QueryLdap("(objectclass=container)", Helpers.ResolutionProps,
                 SearchScope.OneLevel, domain.DistinguishedName))
             {
                 var type = containedObject.GetLdapType();
@@ -175,10 +172,8 @@ namespace SharpHound3.Tasks
 
             var searcher = Helpers.GetDirectorySearcher(ou.Domain);
             foreach (var containedObject in searcher.QueryLdap(
-                "(|(samAccountType=805306368)(samAccountType=805306369)(objectclass=organizationalUnit))", new[]
-                {
-                    "objectguid", "objectclass", "objectsid", "samaccounttype"
-                }, SearchScope.OneLevel, ou.DistinguishedName))
+                "(|(samAccountType=805306368)(samAccountType=805306369)(objectclass=organizationalUnit))",
+                Helpers.ResolutionProps, SearchScope.OneLevel, ou.DistinguishedName))
             {
                 var type = containedObject.GetLdapType();
 

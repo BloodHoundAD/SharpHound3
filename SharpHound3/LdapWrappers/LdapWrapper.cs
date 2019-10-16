@@ -15,7 +15,7 @@ namespace SharpHound3.LdapWrappers
         }
 
         public string DisplayName { get; set; }
-        public string ObjectIdentifer { get; set; }
+        public string ObjectIdentifier { get; set; }
         public string DistinguishedName { get; set; }
 
         public Dictionary<string, object> Properties = new Dictionary<string, object>();
@@ -32,7 +32,7 @@ namespace SharpHound3.LdapWrappers
 
         public override string ToString()
         {
-            return $"{DisplayName} - {string.Join("\n", (object[])Aces)}";
+            return $"{DisplayName}";
         }
     }
 }

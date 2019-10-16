@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using SharpHound3.Enums;
 using SharpHound3.LdapWrappers;
 
 namespace SharpHound3.Tasks
@@ -116,7 +117,7 @@ namespace SharpHound3.Tasks
             if (wrapper == null) return wrapper;
             wrapper.DistinguishedName = distinguishedName;
             // IF objectSid is null, its probably an OU, so use the objectguid property instead
-            wrapper.ObjectIdentifer = objectSid ?? searchResultEntry.GetProperty("objectguid");
+            wrapper.ObjectIdentifier = searchResultEntry.GetObjectIdentifier();
 
             //Return our wrapper for the next step in the pipeline
             return wrapper;

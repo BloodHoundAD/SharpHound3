@@ -126,7 +126,6 @@ namespace SharpHound3.Tasks
 
             wrapper.Properties.Add("serviceprincipalnames", result.GetPropertyAsArray("serviceprincipalname"));
 
-            wrapper.Properties.Add("lastlogon", ConvertToUnixEpoch(result.GetProperty("lastlogon")));
             wrapper.Properties.Add("lastlogontimestamp", ConvertToUnixEpoch(result.GetProperty("lastlogontimestamp")));
             wrapper.Properties.Add("pwdlastset", ConvertToUnixEpoch(result.GetProperty("pwdlastset")));
             

@@ -14,5 +14,7 @@ namespace SharpHound3.LdapWrappers
         }
 
         public string[] AllowedToDelegate { get; set; }
+
+        public string PrimaryGroupSid { get; set; }
     }
 }

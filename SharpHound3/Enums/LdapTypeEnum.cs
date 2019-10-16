@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
-namespace SharpHound3
+namespace SharpHound3.Enums
 {
-    internal enum LdapTypeEnum
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum LdapTypeEnum
     {
         User,
         Computer,
