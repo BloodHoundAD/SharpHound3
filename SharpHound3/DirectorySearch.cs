@@ -17,28 +17,64 @@ namespace SharpHound3
         private readonly string _domainName;
         private readonly Domain _domain;
         private Dictionary<string, string> _domainGuidMap;
+        private readonly ConcurrentBag<LdapConnection> _connectionPool = new ConcurrentBag<LdapConnection>();
 
         public DirectorySearch(string domainName = null, string domainController = null)
         {
             _domainName = domainName;
             _domain = GetDomain();
             _domainName = _domain.Name;
-            _domainController = domainController;
+            _domainController = Options.Instance.DomainController ?? domainController;
             CreateSchemaMap();
+        }
+
+        internal SearchResultEntry GetOne(string ldapFilter, string[] props, SearchScope scope, string adsPath = null)
+        {
+            var connection = GetLdapConnection();
+            try
+            {
+                var searchRequest = CreateSearchRequest(ldapFilter, scope, props);
+
+                SearchResponse searchResponse;
+                try
+                {
+                    searchResponse = (SearchResponse)connection.SendRequest(searchRequest);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("\nUnexpected exception occured:\n\t{0}: {1}",
+                        e.GetType().Name, e.Message);
+                    return null;
+                }
+
+                if (searchResponse.Entries.Count == 0)
+                    return null;
+
+                return searchResponse.Entries[0];
+            }
+            finally
+            {
+                _connectionPool.Add(connection);
+            }
         }
 
         internal IEnumerable<SearchResultEntry> QueryLdap(string ldapFilter, string[] props, SearchScope scope, string adsPath = null)
         {
-            using (var connection = GetLdapConnection())
+            var connection = GetLdapConnection();
+            try
             {
                 var searchRequest = CreateSearchRequest(ldapFilter, scope, props);
                 var pageRequest = new PageResultRequestControl(500);
                 searchRequest.Controls.Add(pageRequest);
-                var securityDescriptorFlagControl = new SecurityDescriptorFlagControl
+
+                if ((Options.Instance.ResolvedCollectionMethods & CollectionMethodResolved.ACL) != 0)
                 {
-                    SecurityMasks = SecurityMasks.Dacl | SecurityMasks.Owner
-                };
-                searchRequest.Controls.Add(securityDescriptorFlagControl);
+                    var securityDescriptorFlagControl = new SecurityDescriptorFlagControl
+                    {
+                        SecurityMasks = SecurityMasks.Dacl | SecurityMasks.Owner
+                    };
+                    searchRequest.Controls.Add(securityDescriptorFlagControl);
+                }
 
                 while (true)
                 {
@@ -53,7 +89,7 @@ namespace SharpHound3
                             e.GetType().Name, e.Message);
                         yield break;
                     }
-                    
+
                     if (searchResponse.Controls.Length != 1 ||
                         !(searchResponse.Controls[0] is PageResultResponseControl))
                     {
@@ -73,6 +109,10 @@ namespace SharpHound3
 
                     pageRequest.Cookie = pageResponse.Cookie;
                 }
+            }
+            finally
+            {
+                _connectionPool.Add(connection);
             }
         }
 
@@ -105,9 +145,10 @@ namespace SharpHound3
         /// <returns></returns>
         private IEnumerable<string> RangeRetrievalAsq(string distinguishedName, string attribute)
         {
-            using (var connection = GetLdapConnection())
+            var connection = GetLdapConnection();
+            try
             {
-                var searchRequest = CreateSearchRequest("(&)", SearchScope.Base, null, distinguishedName);
+                var searchRequest = CreateSearchRequest("(objectclass=*)", SearchScope.Base, null, distinguishedName);
                 var asq = new AsqRequestControl(attribute);
                 searchRequest.Controls.Add(asq);
 
@@ -119,12 +160,14 @@ namespace SharpHound3
                     throw new ControlNotSupportedException();
                 }
 
-                //var asqResponse = (AsqResponseControl) searchResponse.Controls[0];
-
                 foreach (SearchResultEntry entry in searchResponse.Entries)
                 {
                     yield return entry.DistinguishedName;
                 }
+            }
+            finally
+            {
+                _connectionPool.Add(connection);
             }
         }
 
@@ -136,21 +179,22 @@ namespace SharpHound3
         /// <returns></returns>
         private IEnumerable<string> RangeRetrievalFallback(string distinguishedName, string attribute)
         {
-            var index = 0;
-            var step = 0;
-            var baseString = $"{attribute};";
-            var currentRange = $"{baseString};range={index}-*";
-
-            using (var connection = GetLdapConnection())
+            var connection = GetLdapConnection();
+            try
             {
-                var searchRequest = CreateSearchRequest($"{attribute}=*", SearchScope.Base, new string[] { currentRange },
+                var index = 0;
+                var step = 0;
+                var baseString = $"{attribute};";
+                var currentRange = $"{baseString};range={index}-*";
+
+                var searchRequest = CreateSearchRequest($"{attribute}=*", SearchScope.Base, new string[] {currentRange},
                     distinguishedName);
 
                 var searchDone = false;
 
                 while (true)
                 {
-                    var response = (SearchResponse)connection.SendRequest(searchRequest);
+                    var response = (SearchResponse) connection.SendRequest(searchRequest);
 
                     if (response?.Entries.Count == 1)
                     {
@@ -170,7 +214,10 @@ namespace SharpHound3
                         }
 
                         if (searchDone)
+                        {
                             yield break;
+                        }
+
 
                         currentRange = $"{baseString};range={index}-{index + step}";
 
@@ -178,8 +225,14 @@ namespace SharpHound3
                         searchRequest.Attributes.Add(currentRange);
                     }
                     else
+                    {
                         yield break;
+                    }
                 }
+            }
+            finally
+            {
+                _connectionPool.Add(connection);
             }
         }
 
@@ -211,13 +264,25 @@ namespace SharpHound3
 
         private LdapConnection GetLdapConnection()
         {
+            if (_connectionPool.TryTake(out var connection))
+            {
+                return connection;
+            }
+
             var domainController = _domainController ?? _domainName;
-            var identifier = new LdapDirectoryIdentifier(domainController, false, false);
-            var connection = new LdapConnection(identifier);
+            var port = Options.Instance.LdapPort == 0
+                ? (Options.Instance.SecureLDAP ? 636 : 389)
+                : Options.Instance.LdapPort;
+            var identifier = new LdapDirectoryIdentifier(domainController, port, false, false);
+            connection = new LdapConnection(identifier);
 
             var ldapSessionOptions = connection.SessionOptions;
-            ldapSessionOptions.Signing = true;
-            ldapSessionOptions.Sealing = true;
+            if (!Options.Instance.DisableKerberosSigning)
+            {
+                ldapSessionOptions.Signing = true;
+                ldapSessionOptions.Sealing = true;
+            }
+            
             ldapSessionOptions.ProtocolVersion = 3;
             ldapSessionOptions.ReferralChasing = ReferralChasingOptions.None;
             
@@ -248,6 +313,14 @@ namespace SharpHound3
             }
 
             _domainGuidMap = map;
+        }
+
+        ~DirectorySearch()
+        {
+            foreach (var connection in _connectionPool)
+            {
+                connection.Dispose();
+            }
         }
     }
 }
