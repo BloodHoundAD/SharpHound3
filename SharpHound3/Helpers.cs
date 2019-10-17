@@ -531,10 +531,13 @@ namespace SharpHound3
             
         }
 
-        internal static string ResolveFilepath(string filename, string extension, bool addTime)
+        internal static string ResolveFileName(string filename, string extension, bool addTime)
         {
-            var finalFilename = $"{filename}.{extension}";
-            if (extension == "json" && Options.Instance.RandomizeFilenames)
+            var finalFilename = filename;
+            if (!filename.EndsWith(extension))
+                finalFilename = $"{filename}.{extension}";
+
+            if ((extension == "json" || extension == "zip") && Options.Instance.RandomizeFilenames)
             {
                 finalFilename = $"{Path.GetRandomFileName()}.{extension}";
             }

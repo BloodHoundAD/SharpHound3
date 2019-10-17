@@ -33,11 +33,19 @@ namespace SharpHound3
                 BoundedCapacity = 250
             });
 
+            var outputBlock = new ActionBlock<LdapWrapper>(OutputTasks.WriteJsonOutput, new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = 250,
+                MaxDegreeOfParallelism = 1
+            });
+
             findTypeBlock.LinkTo(processGroupBlock, linkOptions, wrapper => wrapper != null);
             findTypeBlock.LinkTo(DataflowBlock.NullTarget<LdapWrapper>(), (item) => (item == null));
-            processGroupBlock.LinkTo(DataflowBlock.NullTarget<LdapWrapper>());
+            processGroupBlock.LinkTo(outputBlock, linkOptions);
             producer.StartProducer(findTypeBlock);
-            processGroupBlock.Completion.Wait();
+            outputBlock.Completion.Wait();
+
+            OutputTasks.CompleteOutput();
 
             //var processDaclBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ACLTasks.ProcessDACL, new ExecutionDataflowBlockOptions
             //{

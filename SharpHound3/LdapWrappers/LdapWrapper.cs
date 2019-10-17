@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.DirectoryServices.Protocols;
+using Newtonsoft.Json;
 using SharpHound3.JSON;
 
 namespace SharpHound3.LdapWrappers
@@ -7,11 +8,11 @@ namespace SharpHound3.LdapWrappers
     internal class LdapWrapper
     {
         private string _domain;
-        internal SearchResultEntry _ldapEntry;
 
         internal LdapWrapper(SearchResultEntry entry)
         {
-            _ldapEntry = entry;
+            SearchResult = entry;
+            Aces = new ACL[0];
         }
 
         public string DisplayName { get; set; }
@@ -27,8 +28,8 @@ namespace SharpHound3.LdapWrappers
             get => _domain ?? (_domain = Helpers.DistinguishedNameToDomain(DistinguishedName));
             set => _domain = value.ToUpper();
         }
-
-        public SearchResultEntry SearchResult => _ldapEntry;
+        [JsonIgnore]
+        public SearchResultEntry SearchResult { get; }
 
         public override string ToString()
         {

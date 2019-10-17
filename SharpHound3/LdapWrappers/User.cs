@@ -11,6 +11,7 @@ namespace SharpHound3.LdapWrappers
     {
         internal User(SearchResultEntry entry) : base(entry)
         {
+            AllowedToDelegate = new string[0];
         }
 
         public string[] AllowedToDelegate { get; set; }

@@ -11,6 +11,9 @@ namespace SharpHound3.LdapWrappers
     {
         internal OU(SearchResultEntry entry) : base(entry)
         {
+            Users = new string[0];
+            Computers = new string[0];
+            ChildOus = new string[0];
         }
 
         public bool ACLProtected { get; set; }

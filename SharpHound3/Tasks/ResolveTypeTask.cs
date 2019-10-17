@@ -24,6 +24,7 @@ namespace SharpHound3.Tasks
             var accountDomain = Helpers.DistinguishedNameToDomain(distinguishedName);
             var objectSid = searchResultEntry.GetSid();
             var objectType = LdapTypeEnum.Unknown;
+            string objectIdentifier;
 
             LdapWrapper wrapper;
 
@@ -32,6 +33,7 @@ namespace SharpHound3.Tasks
             {
                 accountName = commonPrincipal.Name;
                 objectType = commonPrincipal.Type;
+                objectIdentifier = Helpers.ConvertCommonSid(objectSid, accountDomain);
             }
             else
             {
@@ -62,6 +64,7 @@ namespace SharpHound3.Tasks
                         objectType = LdapTypeEnum.Domain;
                     }
                 }
+                objectIdentifier = searchResultEntry.GetObjectIdentifier();
             }
 
             //Depending on the object type, create the appropriate wrapper object
@@ -116,8 +119,8 @@ namespace SharpHound3.Tasks
             //Set the DN/SID for the wrapper going forward
             if (wrapper == null) return wrapper;
             wrapper.DistinguishedName = distinguishedName;
-            // IF objectSid is null, its probably an OU, so use the objectguid property instead
-            wrapper.ObjectIdentifier = searchResultEntry.GetObjectIdentifier();
+
+            wrapper.ObjectIdentifier = objectIdentifier;
 
             //Return our wrapper for the next step in the pipeline
             return wrapper;

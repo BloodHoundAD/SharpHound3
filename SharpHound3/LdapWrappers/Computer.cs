@@ -4,6 +4,7 @@ using System.DirectoryServices.Protocols;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SharpHound3.JSON;
 
 namespace SharpHound3.LdapWrappers
 {
@@ -11,6 +12,9 @@ namespace SharpHound3.LdapWrappers
     {
         internal Computer(SearchResultEntry entry) : base(entry)
         {
+            AllowedToAct = new string[0];
+            AllowedToDelegate = new string[0];
+            Sessions = new Session[0];
         }
 
         public string[] AllowedToDelegate { get; set; }
@@ -18,5 +22,7 @@ namespace SharpHound3.LdapWrappers
         public string[] AllowedToAct { get; set; }
 
         public string PrimaryGroupSid { get; set; }
+
+        public Session[] Sessions { get; set; }
     }
 }
