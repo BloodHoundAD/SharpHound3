@@ -98,7 +98,7 @@ namespace SharpHound3.Tasks
 
                 foreach (var computerName in delegates)
                 {
-                    var resolvedHost = Helpers.ResolveHostToValue(computerName, wrapper.Domain);
+                    var resolvedHost = Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
                     trustedToAuthComputers.Add(resolvedHost);
                 }
             }
@@ -217,7 +217,7 @@ namespace SharpHound3.Tasks
 
                 foreach (var computerName in delegates)
                 {
-                    var resolvedHost = Helpers.ResolveHostToValue(computerName, wrapper.Domain);
+                    var resolvedHost = Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
                     trustedToAuthComputers.Add(resolvedHost);
                 }
             }

@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Timers;
 using ICSharpCode.SharpZipLib.Zip;
 using Newtonsoft.Json;
 using SharpHound3.JSON;
@@ -13,6 +16,7 @@ namespace SharpHound3.Tasks
 {
     internal class OutputTasks
     {
+        private static readonly BlockingCollection<ComputerError> ComputerErrorQueue = new BlockingCollection<ComputerError>();
         private static readonly List<string> UsedFileNames = new List<string>();
         private static readonly Lazy<JsonFileWriter> UserOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
         private static readonly Lazy<JsonFileWriter> GroupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
@@ -20,6 +24,24 @@ namespace SharpHound3.Tasks
         private static readonly Lazy<JsonFileWriter> DomainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
         private static readonly Lazy<JsonFileWriter> GpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
         private static readonly Lazy<JsonFileWriter> OuOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
+        private static int _lastCount = 0;
+        private static int _currentCount = 0;
+        private static Timer _statusTimer;
+
+        internal static void StartOutputTimer()
+        {
+            Console.WriteLine(
+                $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount}) -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM");
+            _statusTimer = new Timer(Options.Instance.StatusInterval);
+            _statusTimer.Elapsed += (sender, e) =>
+            {
+                Console.WriteLine(
+                    $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount}) -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM");
+                _lastCount = _currentCount;
+            };
+            _statusTimer.AutoReset = true;
+            _statusTimer.Start();
+        }
 
         internal static void WriteJsonOutput(LdapWrapper wrapper)
         {
@@ -44,6 +66,8 @@ namespace SharpHound3.Tasks
                     UserOutput.Value.WriteObject(user);
                     break;
             }
+
+            _currentCount++;
         }
 
         internal static void CompleteOutput()
@@ -122,7 +146,10 @@ namespace SharpHound3.Tasks
                 zipStream.Finish();
             }
 
-            Console.WriteLine("Finished compressing files. Happy pathing!");
+            if (Options.Instance.DumpComputerErrors)
+                CompleteErrorOutput();
+
+            Console.WriteLine("Finished compressing files. Happy graphing!");
         }
 
         private static string GenerateZipPassword()
@@ -135,6 +162,38 @@ namespace SharpHound3.Tasks
                 builder.Append(space[random.Next(space.Length)]);
             }
             return builder.ToString();
+        }
+
+        internal static Task StartComputerErrorTask()
+        {
+            return Task.Factory.StartNew(() =>
+            {
+                var fileName = Helpers.ResolveFileName("computererror", "csv", true);
+                var count = 0;
+                using (var writer = new StreamWriter(fileName, false))
+                {
+                    writer.WriteLine("ComputerName, Task, Error");
+                    foreach (var error in ComputerErrorQueue.GetConsumingEnumerable())
+                    {
+                        writer.WriteLine(error.ToCsv());
+                        count++;
+                        if (count % 100 == 0)
+                            writer.Flush();
+                    }
+
+                    writer.Flush();
+                }
+            }, TaskCreationOptions.LongRunning);
+        }
+
+        internal static void AddComputerError(ComputerError error)
+        {
+            ComputerErrorQueue.Add(error);
+        }
+
+        private static void CompleteErrorOutput()
+        {
+            ComputerErrorQueue.CompleteAdding();
         }
 
         /// <summary>
@@ -171,6 +230,8 @@ namespace SharpHound3.Tasks
                 JsonWriter.WriteValue(Count);
                 JsonWriter.WritePropertyName("type");
                 JsonWriter.WriteValue(_baseFileName);
+                JsonWriter.WritePropertyName("version");
+                JsonWriter.WriteValue(2);
                 JsonWriter.WriteEndObject();
                 JsonWriter.Close();
             }
@@ -180,7 +241,7 @@ namespace SharpHound3.Tasks
                 Serializer.Serialize(JsonWriter, json);
                 Count++;
                 if (Count % 100 == 0)
-                    JsonWriter.FlushAsync();
+                    JsonWriter.Flush();
             }
 
             private JsonTextWriter CreateFile(string baseName)

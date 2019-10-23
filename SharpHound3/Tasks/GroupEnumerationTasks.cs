@@ -102,7 +102,7 @@ namespace SharpHound3.Tasks
         private static GroupMember TranslateDistinguishedName(string distinguishedName)
         {
             //Check cache to see if we have the item in there first.
-            if (AppCache.Get(distinguishedName, out var resolved))
+            if (AppCache.GetPrincipal(distinguishedName, out var resolved))
             {
                 return new GroupMember
                 {
@@ -160,7 +160,7 @@ namespace SharpHound3.Tasks
                 }
 
                 //Use the LookupAccountSid API call to get the type of the SID
-                type = LookupSidType(sid);
+                type = Helpers.LookupSidType(sid);
 
                 return new GroupMember
                 {
@@ -196,52 +196,7 @@ namespace SharpHound3.Tasks
             }
         }
 
-        /// <summary>
-        /// Uses the LookupAccountSid function to attempt to get the type of a sid
-        /// </summary>
-        /// <param name="sid"></param>
-        /// <returns></returns>
-        private static LdapTypeEnum LookupSidType(string sid)
-        {
-            var name = new StringBuilder();
-            var nameLength = (uint)name.Capacity;
-            var referencedDomain = new StringBuilder();
-            var domainLength = (uint) referencedDomain.Capacity;
-
-            var securityIdentifier = new SecurityIdentifier(sid);
-            var sidBytes = new byte[securityIdentifier.BinaryLength];
-            securityIdentifier.GetBinaryForm(sidBytes, 0);
-
-            var error = 0;
-            if (!LookupAccountSid(null, sidBytes, name, ref nameLength, referencedDomain, ref domainLength, out var type))
-            {
-                error = Marshal.GetLastWin32Error();
-                if (error == 122)
-                {
-                    name.EnsureCapacity((int) nameLength);
-                    referencedDomain.EnsureCapacity((int) domainLength);
-                    error = 0;
-                    if (!LookupAccountSid(null, sidBytes, name, ref nameLength, referencedDomain, ref domainLength,
-                        out type))
-                    {
-                        error = Marshal.GetLastWin32Error();
-                    }
-                }
-            }
-
-            if (error != 0) return LdapTypeEnum.Unknown;
-            switch (type)
-            {
-                case SID_NAME_USE.SidTypeComputer:
-                    return LdapTypeEnum.Computer;
-                case SID_NAME_USE.SidTypeGroup:
-                    return LdapTypeEnum.Group;
-                case SID_NAME_USE.SidTypeUser:
-                    return LdapTypeEnum.User;
-                default:
-                    return LdapTypeEnum.Unknown;
-            }
-        }
+        
 
         /// <summary>
         /// Attempts to resolve a distguishedname to the proper format using only LDAP, allowing us to control what server it binds too.
@@ -313,31 +268,6 @@ namespace SharpHound3.Tasks
             };
         }
 
-        #region LookupAccountSid
-
-        [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        static extern bool LookupAccountSid(
-            string lpSystemName,
-            [MarshalAs(UnmanagedType.LPArray)] byte[] Sid,
-            System.Text.StringBuilder lpName,
-            ref uint cchName,
-            System.Text.StringBuilder ReferencedDomainName,
-            ref uint cchReferencedDomainName,
-            out SID_NAME_USE peUse);
-
-        enum SID_NAME_USE
-        {
-            SidTypeUser = 1,
-            SidTypeGroup,
-            SidTypeDomain,
-            SidTypeAlias,
-            SidTypeWellKnownGroup,
-            SidTypeDeletedAccount,
-            SidTypeInvalid,
-            SidTypeUnknown,
-            SidTypeComputer
-        }
-
-        #endregion
+        
     }
 }

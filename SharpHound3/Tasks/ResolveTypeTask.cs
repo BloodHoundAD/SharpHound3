@@ -74,7 +74,8 @@ namespace SharpHound3.Tasks
                     accountName = accountName?.TrimEnd('$');
                     wrapper = new Computer(searchResultEntry)
                     {
-                        DisplayName = $"{accountName}.{accountDomain}".ToUpper()
+                        DisplayName = $"{accountName}.{accountDomain}".ToUpper(),
+                        SamAccountName = accountName
                     };
                     break;
                 case LdapTypeEnum.User:
@@ -117,7 +118,11 @@ namespace SharpHound3.Tasks
             }
 
             //Set the DN/SID for the wrapper going forward
-            if (wrapper == null) return wrapper;
+            if (wrapper == null)
+            {
+                Console.WriteLine($"Null Wrapper: {distinguishedName}");
+                return wrapper;
+            }
             wrapper.DistinguishedName = distinguishedName;
 
             wrapper.ObjectIdentifier = objectIdentifier;

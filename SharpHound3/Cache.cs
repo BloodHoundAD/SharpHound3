@@ -14,10 +14,14 @@ namespace SharpHound3
 {
     internal class Cache
     {
-        private ConcurrentDictionary<string, ResolvedPrincipal> _dictionary;
+        private ConcurrentDictionary<string, object> _dictionary;
+
+        [JsonIgnore]
         private static readonly Lazy<Cache> CacheInstance = new Lazy<Cache>(() => new Cache());
+        [JsonIgnore]
         private readonly Mutex _bhMutex;
 
+        [JsonIgnore]
         public static Cache Instance => CacheInstance.Value;
 
         private Cache()
@@ -26,21 +30,35 @@ namespace SharpHound3
             _bhMutex = new Mutex(false, $"MUTEX:{GetBase64MachineID()}");
         }
 
-        internal bool Get(string key, out ResolvedPrincipal value)
+        internal bool GetPrincipal(string key, out ResolvedPrincipal value)
         {
-            return _dictionary.TryGetValue(key, out value);
+            var success = _dictionary.TryGetValue($"RP:{key}", out var principal);
+            value = principal as ResolvedPrincipal;
+            return success;
+        }
+
+        internal bool GetGlobalCatalogMatches(string key, out string[] sids)
+        {
+            var success = _dictionary.TryGetValue($"GC:{key}", out var possible);
+            sids = possible as string[];
+            return success;
         }
 
         internal void Add(string key, ResolvedPrincipal value)
         {
-            _dictionary.TryAdd(key, value);
+            _dictionary.TryAdd($"RP:{key}", value);
+        }
+
+        internal void Add(string key, string[] domains)
+        {
+            _dictionary.TryAdd($"GC:{key}", domains);
         }
 
         internal void LoadCache()
         {
             if (Options.Instance.InvalidateCache)
             {
-                _dictionary = new ConcurrentDictionary<string, ResolvedPrincipal>();
+                _dictionary = new ConcurrentDictionary<string, object>();
                 return;
             }
 
@@ -48,7 +66,7 @@ namespace SharpHound3
 
             if (!File.Exists(fileName))
             {
-                _dictionary = new ConcurrentDictionary<string, ResolvedPrincipal>();
+                _dictionary = new ConcurrentDictionary<string, object>();
                 return;
             }
 
@@ -57,7 +75,8 @@ namespace SharpHound3
                 _bhMutex.WaitOne();
                 var bytes = File.ReadAllBytes(fileName);
                 var json = new UTF8Encoding(true).GetString(bytes);
-                _dictionary = JsonConvert.DeserializeObject<ConcurrentDictionary<string,ResolvedPrincipal>>(json);
+
+                _dictionary = JsonConvert.DeserializeObject<ConcurrentDictionary<string, object>>(json);
             }
             finally
             {

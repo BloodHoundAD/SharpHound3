@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.DirectoryServices.ActiveDirectory;
 using System.DirectoryServices.Protocols;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -14,6 +15,8 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Heijden.DNS;
 using SharpHound3.Enums;
+using SharpHound3.LdapWrappers;
+using Domain = System.DirectoryServices.ActiveDirectory.Domain;
 
 namespace SharpHound3
 {
@@ -29,8 +32,10 @@ namespace SharpHound3
         private static readonly ConcurrentDictionary<string, string> DomainNetbiosMap = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, string> AccountNameToSidCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, Resolver> DNSResolverCache = new ConcurrentDictionary<string, Resolver>();
+        private static readonly ConcurrentDictionary<string, string> SidToDomainNameCache = new ConcurrentDictionary<string, string>();
+        private static readonly ConcurrentDictionary<string, bool> PingCache = new ConcurrentDictionary<string, bool>();
 
-        internal static readonly string[] ResolutionProps = {"samaccounttype", "objectsid", "objectguid", "objectclass"};
+        internal static readonly string[] ResolutionProps = {"samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname"};
 
         private static readonly byte[] NameRequest = 
         {
@@ -94,119 +99,124 @@ namespace SharpHound3
             return searcher;
         }
 
-        internal static string ResolveHostToValue(string hostname, string domain)
+        internal static string TryResolveHostToSid(string hostname, string domain)
         {
-            //Upcase for consistency
-            var newHostName = hostname.ToUpper();
-            
-            //Turn SPNs into just the hostname portion
-            var parsedHost = SPNToHost(newHostName);
+            //Uppercase for consistency
+            var newHostname = hostname.ToUpper();
+            //Convert SPN values to a basic hostname
+            newHostname = SPNToHost(newHostname);
+            //Strip $ signs
+            newHostname = newHostname.TrimEnd('$');
+            var normalizedDomainName = NormalizeDomainName(domain);
 
-            //Check our cache for a resolution already
-            if (HostResolutionMap.TryGetValue(parsedHost, out var resolvedHostName)) return resolvedHostName;
+            if (HostResolutionMap.TryGetValue(newHostname, out var resolvedHost)) return resolvedHost;
 
-            string computerDomain;
-            string computerNetbios;
 
-            //If we have an IP address the next bit of logic is useless
-            if (!IPAddress.TryParse(parsedHost, out _))
+            string computerName;
+            string computerDomain = null;
+            if (!IPAddress.TryParse(newHostname, out _))
             {
-                //Turn a DNS name into potentially a computer name + domain
-                if (parsedHost.Contains("."))
+                // Assume we got a hostname in the format PRIMARY.testlab.local
+                if (newHostname.Contains("."))
                 {
-                    var splitName = parsedHost.Split('.');
-                    computerNetbios = splitName[0];
-                    computerDomain = GetDomainNetbiosName(String.Join(".", splitName.Skip(1)));
+                    var splitName = newHostname.Split('.');
+                    computerName = splitName[0];
+                    computerDomain = string.Join(".", splitName.Skip(1));
                 }
+                //Assume we just got the netbios name. Like PRIMARY
                 else
                 {
-                    //Assume the domain is the same as the one passed in
-                    computerDomain = GetDomainNetbiosName(domain);
-                    computerNetbios = parsedHost;
+                    computerName = newHostname;
+                    computerDomain = domain ?? normalizedDomainName;
                 }
 
-                //Try and resolve the 
-                if (AccountNameToSid($"{computerDomain}\\{computerNetbios}", out var sid))
+                if (AccountNameToSid(computerName, computerDomain,true, out var sid))
                 {
-                    HostResolutionMap.TryAdd(parsedHost, sid);
+                    HostResolutionMap.TryAdd(newHostname, sid);
                     return sid;
                 }
             }
 
-            //Call NetWkstaGetInfo and see if the computer will give us a netbios name/domain
-            if (CallNetWkstaGetInfo(parsedHost, out var workstationInfo))
+            //Call NetWkstaGetInfo and see if we can get the info from there.
+            if (Helpers.PingHost(newHostname, 445) && CallNetWkstaGetInfo(newHostname, out var workstationInfo))
             {
-                //If we got the info, turning this into a real account should be simple
-                computerDomain = workstationInfo.lan_group.ToUpper();
-                computerNetbios = workstationInfo.computer_name;
+                computerDomain = workstationInfo.lan_group;
+                computerName = workstationInfo.computer_name;
 
-                if (AccountNameToSid($"{computerDomain}\\{computerNetbios}", out var sid))
+                //Try converting Computer Name to SID
+                if (AccountNameToSid(computerName, computerDomain, true, out var sid))
                 {
-                    HostResolutionMap.TryAdd(parsedHost, sid);
+                    HostResolutionMap.TryAdd(newHostname, sid);
                     return sid;
                 }
-
-                //Sid resolution failed, so just return a normalized name
-                computerDomain = NormalizeDomainName(computerDomain);
-                var fullName = $"{computerNetbios}.{computerDomain}".ToUpper();
-                HostResolutionMap.TryAdd(parsedHost, fullName);
-                return fullName;
             }
 
-            // Next try requesting the Netbios name from the computer using a UDP packet
-            if (RequestNetbiosNameFromComputer(parsedHost, out computerNetbios))
+            if (RequestNetbiosNameFromComputer(newHostname, out computerName))
             {
-                //We succeeded, so we'll assume the domain is the one we're enumerating from. Attempt to convert to a SID
-                computerDomain = GetDomainNetbiosName(domain);
-                if (AccountNameToSid($"{computerDomain}\\{computerNetbios}", out var sid))
+                //Lets try and use computerDomain if it was set by another method previously, it might be more accurate than what we passed into the function
+                //If computerDomain is still null, then set it to our current domain name
+                computerDomain = computerDomain ?? normalizedDomainName;
+
+                if (AccountNameToSid(computerName, computerDomain, true, out var sid))
                 {
-                    HostResolutionMap.TryAdd(hostname, sid);
+                    HostResolutionMap.TryAdd(newHostname, sid);
                     return sid;
                 }
-
-                //Sid resolution failed, so just return a normalized name
-                computerDomain = NormalizeDomainName(computerDomain);
-                var fullName = $"{computerNetbios}.{computerDomain}".ToUpper();
-                HostResolutionMap.TryAdd(parsedHost, fullName);
-                return fullName;
             }
 
-            // Fallback to DNS
+            // Attempt to fall back to DNS
             var resolver = GetDNSResolver(domain);
-            // If the host is an IP address, attempt to query a PTR
-            if (IPAddress.TryParse(parsedHost, out var ip))
+
+            if (IPAddress.TryParse(newHostname, out var ipAddress))
             {
-                var query = resolver.Query(Resolver.GetArpaFromIp(ip), QType.PTR);
+                var query = resolver.Query(Resolver.GetArpaFromIp(ipAddress), QType.PTR);
                 if (query.RecordsPTR.Length > 0)
                 {
                     var resolved = query.RecordsPTR[0].ToString().TrimEnd('.');
-                    HostResolutionMap.TryAdd(parsedHost, resolved);
-                    return resolved;
+                    var splitName = resolved.Split('.');
+                    computerName = splitName[0];
+                    computerDomain = string.Join(".", splitName.Skip(1));
+
+                    if (AccountNameToSid(computerName, computerDomain,true, out var sid))
+                    {
+                        HostResolutionMap.TryAdd(newHostname, sid);
+                        return sid;
+                    }
                 }
             }
             else
             {
-                //Host is not an IP, so look for the A record and return the result of that
-                var query = resolver.Query($"{parsedHost}.{NormalizeDomainName(domain)}", QType.A);
+                var query = resolver.Query($"{newHostname}.{NormalizeDomainName(domain)}", QType.A);
                 if (query.RecordsA.Length > 0)
                 {
-                    var resolved  = query.RecordsA[0].RR.NAME.TrimEnd('.');
-                    HostResolutionMap.TryAdd(parsedHost, resolved);
-                    return resolved;
+                    var resolved = query.RecordsA[0].RR.NAME.TrimEnd('.');
+                    var splitName = resolved.Split('.');
+                    computerName = splitName[0];
+                    computerDomain = string.Join(".", splitName.Skip(1));
+
+                    if (AccountNameToSid(computerName, computerDomain,true, out var sid))
+                    {
+                        HostResolutionMap.TryAdd(newHostname, sid);
+                        return sid;
+                    }
                 }
             }
 
-            //Everything else has failed. Life is sad. If the hostname contains a . assume its already an FQDN and return it
-            if (parsedHost.Contains("."))
-            {
-                HostResolutionMap.TryAdd(parsedHost, parsedHost);
-                return parsedHost;
-            }
+            //Everything has failed. Life is sad. Just return the hostname, not much else to do here
+            computerName = computerName ?? newHostname;
+            computerDomain = computerDomain ?? normalizedDomainName;
 
-            //Just take the hostname and tack the domain name on at the end. Truly the last fallback.
-            var possibleName = $"{parsedHost}.{NormalizeDomainName(domain)}";
-            HostResolutionMap.TryAdd(parsedHost, possibleName);
-            return possibleName;
+            //If we already have a dot in the name, assume its a hostname of some kind and just return that
+            if (computerName.Contains("."))
+            {
+                HostResolutionMap.TryAdd(newHostname, computerName);
+                return computerName;
+            }
+            
+            //Take our original normalized domain, and return host@domain
+            computerName = $"{computerName}.{computerDomain}";
+            HostResolutionMap.TryAdd(newHostname, computerName);
+            return computerName;
         }
 
         private static string SPNToHost(string target)
@@ -275,10 +285,85 @@ namespace SharpHound3
             return sid;
         }
 
+        internal static bool AccountNameToSid(string accountName, string accountDomain, bool isComputer, out string sid)
+        {
+            if (isComputer)
+            {
+                accountName = $"{accountName}$";
+            }
+
+            if (Cache.Instance.GetPrincipal(accountName, out var principal))
+            {
+                sid = principal.ObjectIdentifier;
+                return sid != null;
+            }
+
+            var domainName = NormalizeDomainName(accountDomain);
+            bool result;
+            if (Options.Instance.DomainController != null)
+            {
+                result = AccountNameToSidLdap(accountName, domainName, out sid);
+            }
+            else
+            {
+                result = AccountNameToSidApi(accountName, domainName, out sid);
+            }
+
+            Cache.Instance.Add(accountName, new ResolvedPrincipal
+            {
+                ObjectIdentifier = sid,
+                ObjectType = isComputer ? LdapTypeEnum.Computer : LdapTypeEnum.User
+            });
+
+            return result;
+        }
+
+        private static bool AccountNameToSidLdap(string computerName, string computerDomain, out string sid)
+        {
+            var searcher = GetDirectorySearcher(computerDomain);
+
+            var result = searcher.GetOne($"(samaccountname={computerName.ToUpper()}$)", ResolutionProps,
+                SearchScope.Subtree);
+
+            if (result == null)
+            {
+                sid = null;
+                return false;
+            }
+
+            sid = result.GetObjectIdentifier();
+            return sid != null;
+        }
+
+        private static bool AccountNameToSidApi(string computerName, string computerDomain, out string sid)
+        {
+            try
+            {
+                var account = new NTAccount($"{computerDomain}\\{computerName}$");
+                var translated = account.Translate(typeof(SecurityIdentifier));
+                sid = translated.Value;
+                return true;
+            }
+            catch
+            {
+                sid = null;
+                return false;
+            }
+        }
+
         internal static bool AccountNameToSid(string accountName, out string sid)
         {
-            if (AccountNameToSidCache.TryGetValue(accountName, out sid))
+            if (Cache.Instance.GetPrincipal(accountName, out var principal))
+            {
+                sid = principal.ObjectIdentifier;
                 return sid != null;
+            }
+
+
+            if (Options.Instance.DomainController != null)
+            {
+
+            }
 
             try
             {
@@ -290,6 +375,7 @@ namespace SharpHound3
             catch
             {
                 AccountNameToSidCache.TryAdd(accountName, null);
+                sid = null;
                 return false;
             }
         }
@@ -344,28 +430,6 @@ namespace SharpHound3
 
             guid = null;
             return false;
-        }
-
-        internal static bool AccountNameToSid(string username, string domain, out string sid)
-        {
-            var netbios = GetDomainNetbiosName(domain);
-            var accountName = $"{netbios}\\{username}";
-
-            if (AccountNameToSidCache.TryGetValue(accountName, out sid))
-                return sid != null;
-
-            try
-            {
-                var account = new NTAccount(accountName);
-                var translated = account.Translate(typeof(SecurityIdentifier));
-                sid = translated.Value;
-                return true;
-            }
-            catch
-            {
-                AccountNameToSidCache.TryAdd(accountName, null);
-                return false;
-            }
         }
 
         private static string GetDomainNetbiosName(string domain)
@@ -450,6 +514,20 @@ namespace SharpHound3
             return null;
         }
 
+        internal static bool PingHost(string hostname, int port)
+        {
+            if (Options.Instance.SkipPing)
+                return true;
+
+            var key = $"{hostname}-{port}".ToUpper();
+
+            if (PingCache.TryGetValue(key, out var portOpen)) return portOpen;
+
+            portOpen = CheckHostPort(hostname, port);
+            PingCache.TryAdd(key, portOpen);
+            return portOpen;
+        }
+
         private static bool CheckHostPort(string hostname, int port)
         {
             using (var client = new TcpClient())
@@ -457,7 +535,7 @@ namespace SharpHound3
                 try
                 {
                     var result = client.BeginConnect(hostname, port, null, null);
-                    var success = result.AsyncWaitHandle.WaitOne();
+                    var success = result.AsyncWaitHandle.WaitOne(500);
                     if (!success) return false;
 
                     client.EndConnect(result);
@@ -471,7 +549,7 @@ namespace SharpHound3
             }
         }
 
-        private static string NormalizeDomainName(string domain)
+        internal static string NormalizeDomainName(string domain)
         {
             var dObj = GetDomainObject(domain);
             return dObj?.Name.ToUpper();
@@ -528,7 +606,178 @@ namespace SharpHound3
                     NetApiBufferFree(wkstaData);
                 }
             }
-            
+        }
+
+        internal static LdapTypeEnum LookupSidType(string sid)
+        {
+            if (Options.Instance.DomainController != null)
+                return LookupSidTypeLdap(sid);
+
+            return LookupSidTypeAPI(sid);
+        }
+
+        internal static LdapTypeEnum LookupSidTypeLdap(string sid)
+        {
+            var hexSid = ConvertSidToHexSid(sid);
+            var domain = GetDomainNameFromSid(sid);
+
+            var searcher = GetDirectorySearcher(domain);
+
+            var result = searcher.GetOne($"(objectsid={hexSid})", ResolutionProps, SearchScope.Subtree);
+            return result?.GetLdapType() ?? LdapTypeEnum.Unknown;
+        }
+
+        /// <summary>
+        /// Uses the LookupAccountSid function to attempt to get the type of a sid
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <returns></returns>
+        internal static LdapTypeEnum LookupSidTypeAPI(string sid)
+        {
+            var name = new StringBuilder();
+            var nameLength = (uint)name.Capacity;
+            var referencedDomain = new StringBuilder();
+            var domainLength = (uint)referencedDomain.Capacity;
+
+            var securityIdentifier = new SecurityIdentifier(sid);
+            var sidBytes = new byte[securityIdentifier.BinaryLength];
+            securityIdentifier.GetBinaryForm(sidBytes, 0);
+
+            var error = 0;
+            if (!LookupAccountSid(null, sidBytes, name, ref nameLength, referencedDomain, ref domainLength, out var type))
+            {
+                error = Marshal.GetLastWin32Error();
+                if (error == 122)
+                {
+                    name.EnsureCapacity((int)nameLength);
+                    referencedDomain.EnsureCapacity((int)domainLength);
+                    error = 0;
+                    if (!LookupAccountSid(null, sidBytes, name, ref nameLength, referencedDomain, ref domainLength,
+                        out type))
+                    {
+                        error = Marshal.GetLastWin32Error();
+                    }
+                }
+            }
+
+            if (error != 0) return LdapTypeEnum.Unknown;
+            switch (type)
+            {
+                case SID_NAME_USE.SidTypeComputer:
+                    return LdapTypeEnum.Computer;
+                case SID_NAME_USE.SidTypeGroup:
+                    return LdapTypeEnum.Group;
+                case SID_NAME_USE.SidTypeUser:
+                    return LdapTypeEnum.User;
+                default:
+                    return LdapTypeEnum.Unknown;
+            }
+        }
+
+        internal static string GetDomainNameFromSid(string sid)
+        {
+            SecurityIdentifier identifier;
+            try
+            {
+                identifier = new SecurityIdentifier(sid);
+            }
+            catch
+            {
+                return null;
+            }
+
+            if (identifier.AccountDomainSid == null)
+            {
+                return null;
+            }
+
+            var domainSid = identifier.AccountDomainSid.Value;
+
+            if (SidToDomainNameCache.TryGetValue(domainSid, out var domainName))
+            {
+                return domainName;
+            }
+
+            if (Options.Instance.DomainController != null)
+                return GetDomainNameFromSidLdap(sid);
+
+            return GetDomainNameFromSidAPI(sid);
+        }
+
+        /// <summary>
+        /// Attempts to get the domain name for a SID using LDAP from the Global Catalog
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <returns></returns>
+        private static string GetDomainNameFromSidLdap(string sid)
+        {
+            var searcher = GetDirectorySearcher(null);
+
+            var hexSid = ConvertSidToHexSid(sid);
+
+            //Search using objectsid first
+            var result = searcher.GetOne($"(&(objectclass=domain)(objectsid={hexSid}))", new[] {"distinguishedname"}, SearchScope.Subtree, globalCatalog:true);
+
+            if (result != null)
+            {
+                var domainName = DistinguishedNameToDomain(result.DistinguishedName);
+                SidToDomainNameCache.TryAdd(sid, domainName);
+                return domainName;
+            }
+
+            //Try trusteddomain objects with the securityidentifier attribute
+            result = searcher.GetOne($"(&(objectclass=trusteddomain)(securityidentifier={sid}))",
+                new[] {"cn"}, SearchScope.Subtree, globalCatalog: true);
+
+            if (result != null)
+            {
+                var domainName = result.GetProperty("cn");
+                SidToDomainNameCache.TryAdd(sid, domainName);
+                return domainName;
+            }
+
+            //We didn't find anything so just return null
+            SidToDomainNameCache.TryAdd(sid, null);
+            return null;
+        }
+
+        private static string GetDomainNameFromSidAPI(string sid)
+        {
+            var name = new StringBuilder();
+            var nameLength = (uint)name.Capacity;
+            var referencedDomain = new StringBuilder();
+            var domainLength = (uint)referencedDomain.Capacity;
+
+            var securityIdentifier = new SecurityIdentifier("S-1-5-21-3130019616-2776909439-2417379446");
+            var sidBytes = new byte[securityIdentifier.BinaryLength];
+            securityIdentifier.GetBinaryForm(sidBytes, 0);
+
+            var error = 0;
+            if (!LookupAccountSid(null, sidBytes, name, ref nameLength, referencedDomain, ref domainLength, out var type))
+            {
+                error = Marshal.GetLastWin32Error();
+                if (error == 122)
+                {
+                    name.EnsureCapacity((int)nameLength);
+                    referencedDomain.EnsureCapacity((int)domainLength);
+                    error = 0;
+                    if (!LookupAccountSid(null, sidBytes, name, ref nameLength, referencedDomain, ref domainLength,
+                        out type))
+                    {
+                        error = Marshal.GetLastWin32Error();
+                    }
+                }
+            }
+
+            if (error != 0)
+            {
+                SidToDomainNameCache.TryAdd(sid, null);
+                return null;
+            }
+
+            var domainName = NormalizeDomainName(referencedDomain.ToString());
+            SidToDomainNameCache.TryAdd(sid, domainName);
+            return domainName;
         }
 
         internal static string ResolveFileName(string filename, string extension, bool addTime)
@@ -685,6 +934,20 @@ namespace SharpHound3
             NameDnsDomain = 12
 
         }
+        #endregion
+
+        #region LookupAccountSid
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        static extern bool LookupAccountSid(
+            string lpSystemName,
+            [MarshalAs(UnmanagedType.LPArray)] byte[] Sid,
+            System.Text.StringBuilder lpName,
+            ref uint cchName,
+            System.Text.StringBuilder ReferencedDomainName,
+            ref uint cchReferencedDomainName,
+            out SID_NAME_USE peUse);
+
         #endregion
 
         #region LookupAccountName

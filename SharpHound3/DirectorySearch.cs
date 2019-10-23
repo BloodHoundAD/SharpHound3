@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SharpHound3.Enums;
 using SearchOption = System.DirectoryServices.Protocols.SearchOption;
 
 namespace SharpHound3
@@ -28,9 +29,61 @@ namespace SharpHound3
             CreateSchemaMap();
         }
 
-        internal SearchResultEntry GetOne(string ldapFilter, string[] props, SearchScope scope, string adsPath = null)
+        internal string[] LookupUserInGC(string username)
         {
-            var connection = GetLdapConnection();
+            if (Cache.Instance.GetGlobalCatalogMatches(username, out var sids))
+            {
+                return sids;
+            }
+
+            var connection = GetGlobalCatalogConnection();
+            try
+            {
+                var searchRequest = CreateSearchRequest($"(&(samAccountType=805306368)(samaccountname={username}))",
+                    SearchScope.Subtree, new[] {"objectsid"});
+
+                SearchResponse searchResponse;
+                try
+                {
+                    searchResponse = (SearchResponse) connection.SendRequest(searchRequest);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("\nUnexpected exception occured:\n\t{0}: {1}",
+                        e.GetType().Name, e.Message);
+                    return new string[0];
+                }
+
+                if (searchResponse.Entries.Count == 0)
+                {
+                    sids = new string[0];
+                    Cache.Instance.Add(username, sids);
+                    return sids;
+                }
+                    
+
+                var results = new List<string>();
+
+                foreach (SearchResultEntry entry in searchResponse.Entries)
+                {
+                    var sid = entry.GetSid();
+                    if (sid != null)
+                        results.Add(sid);
+                }
+
+                sids = results.ToArray();
+                Cache.Instance.Add(username, sids);
+                return sids;
+            }
+            finally
+            {
+                connection.Dispose();
+            }
+        }
+
+        internal SearchResultEntry GetOne(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false)
+        {
+            var connection = globalCatalog ? GetGlobalCatalogConnection() : GetLdapConnection();
             try
             {
                 var searchRequest = CreateSearchRequest(ldapFilter, scope, props);
@@ -54,20 +107,21 @@ namespace SharpHound3
             }
             finally
             {
-                _connectionPool.Add(connection);
+                if (!globalCatalog)
+                    _connectionPool.Add(connection);
             }
         }
 
-        internal IEnumerable<SearchResultEntry> QueryLdap(string ldapFilter, string[] props, SearchScope scope, string adsPath = null)
+        internal IEnumerable<SearchResultEntry> QueryLdap(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false)
         {
-            var connection = GetLdapConnection();
+            var connection = globalCatalog ? GetGlobalCatalogConnection() :  GetLdapConnection();
             try
             {
                 var searchRequest = CreateSearchRequest(ldapFilter, scope, props);
                 var pageRequest = new PageResultRequestControl(500);
                 searchRequest.Controls.Add(pageRequest);
 
-                if ((Options.Instance.ResolvedCollectionMethods & CollectionMethodResolved.ACL) != 0)
+                if (Options.Instance.ResolvedCollectionMethods.HasFlag(CollectionMethodResolved.ACL))
                 {
                     var securityDescriptorFlagControl = new SecurityDescriptorFlagControl
                     {
@@ -112,7 +166,8 @@ namespace SharpHound3
             }
             finally
             {
-                _connectionPool.Add(connection);
+                if (!globalCatalog)
+                    _connectionPool.Add(connection);
             }
         }
 
@@ -260,6 +315,28 @@ namespace SharpHound3
         private DirectoryContext GetDomainContext()
         {
             return new DirectoryContext(DirectoryContextType.Domain, _domainName);
+        }
+
+        private LdapConnection GetGlobalCatalogConnection()
+        {
+            var domainController = _domainController ?? _domainName;
+            var port = 3628;
+
+            var identifier = new LdapDirectoryIdentifier(domainController, port, false, false);
+            var connection = new LdapConnection(identifier);
+
+            var ldapSessionOptions = connection.SessionOptions;
+            if (!Options.Instance.DisableKerberosSigning)
+            {
+                ldapSessionOptions.Signing = true;
+                ldapSessionOptions.Sealing = true;
+            }
+
+            ldapSessionOptions.ProtocolVersion = 3;
+            ldapSessionOptions.ReferralChasing = ReferralChasingOptions.None;
+
+            connection.Timeout = new TimeSpan(0, 5, 0);
+            return connection;
         }
 
         private LdapConnection GetLdapConnection()

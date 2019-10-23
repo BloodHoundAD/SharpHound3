@@ -34,5 +34,6 @@ namespace SharpHound3.Tasks
         {
             return Task.Factory.StartNew(() => ProduceLdap(queue), TaskCreationOptions.LongRunning);
         }
+
     }
 }

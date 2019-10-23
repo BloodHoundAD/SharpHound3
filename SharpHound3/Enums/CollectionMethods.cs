@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace SharpHound3
+namespace SharpHound3.Enums
 {
     public enum CollectionMethodOptions
     {
@@ -18,6 +14,7 @@ namespace SharpHound3
         RDP,
         DCOM,
         LocalAdmin,
+        PSRemote,
         SPNTargets,
         Container,
         GPOLocalGroup,
@@ -40,9 +37,11 @@ namespace SharpHound3
         RDP = 1 << 6,
         DCOM = 1 << 7,
         LocalAdmin = 1 << 8,
-        SPNTargets = 1 << 9,
-        Container = 1 << 10,
-        GPOLocalGroup = 1 << 11,
-        DCOnly = 1 << 12
+        PSRemote = 1 << 9,
+        SPNTargets = 1 << 10,
+        Container = 1 << 11,
+        GPOLocalGroup = 1 << 12,
+        DCOnly = 1 << 13,
+        LocalGroups = DCOM | RDP | LocalAdmin | PSRemote
     }
 }
