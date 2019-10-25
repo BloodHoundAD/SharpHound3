@@ -34,6 +34,9 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Byte form of the S-1-5-32 SID which is "BuiltIn"
+        /// </summary>
         private static readonly Lazy<byte[]> LocalSidBytes = new Lazy<byte[]>(() =>
         {
             var sid = new SecurityIdentifier("S-1-5-32");
@@ -42,18 +45,19 @@ namespace SharpHound3.Tasks
             return bytes;
         });
 
-        private static async Task<List<GroupMember>> GetNetLocalGroupMembers(Computer computer, LocalGroupRids rid)
+        /// <summary>
+        /// Wraps the GetNetLocalGroupMembers call with a timeout, and then processes the results into objects
+        /// </summary>
+        /// <param name="computer"></param>
+        /// <param name="rid">The relative ID of the group we want to query</param>
+        /// <returns></returns>
+        private static async Task<List<GenericMember>> GetNetLocalGroupMembers(Computer computer, LocalGroupRids rid)
         {
             var sids = new IntPtr[0];
-
+            var groupMemberList = new List<GenericMember>();
             var task = Task.Run(() => CallLocalGroupApi(computer, rid, out sids));
 
-            var success = task.Wait(TimeSpan.FromSeconds(10));
-
-            var groupMemberList = new List<GroupMember>();
-
-            if (!success)
-            {
+            if (await Task.WhenAny(task, Task.Delay(10000)) != task){
                 OutputTasks.AddComputerStatus(new ComputerStatus
                 {
                     ComputerName = computer.DisplayName,
@@ -127,7 +131,7 @@ namespace SharpHound3.Tasks
                     type = await Helpers.LookupSidType(sid);
                 }
 
-                groupMemberList.Add(new GroupMember
+                groupMemberList.Add(new GenericMember
                 {
                     MemberType = type,
                     MemberId = finalSid

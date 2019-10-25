@@ -172,7 +172,7 @@ namespace SharpHound3
             //Start computer block here. We want to ping first
             if (!Options.Instance.SkipPing && Options.Instance.IsComputerCollectionSet())
             {
-                var pingTask = new TransformBlock<LdapWrapper, LdapWrapper>(ComputerAvailableTasks.CheckComputerAlive, new ExecutionDataflowBlockOptions
+                var pingTask = new TransformBlock<LdapWrapper, LdapWrapper>(ComputerAvailableTasks.CheckSMBOpen, new ExecutionDataflowBlockOptions
                 {
                     MaxDegreeOfParallelism = 10,
                     BoundedCapacity = 250,

@@ -7,7 +7,7 @@ using SharpHound3.Enums;
 
 namespace SharpHound3.JSON
 {
-    internal class GroupMember
+    internal class GenericMember
     {
         public string MemberId { get; set; }
         public LdapTypeEnum MemberType { get;set; }

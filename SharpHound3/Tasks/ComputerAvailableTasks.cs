@@ -10,7 +10,7 @@ namespace SharpHound3.Tasks
 {
     internal class ComputerAvailableTasks
     {
-        internal static LdapWrapper CheckComputerAlive(LdapWrapper wrapper)
+        internal static LdapWrapper CheckSMBOpen(LdapWrapper wrapper)
         {
             if (wrapper is Computer computer)
             {

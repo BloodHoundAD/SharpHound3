@@ -13,14 +13,14 @@ namespace SharpHound3.LdapWrappers
     {
         internal Computer(SearchResultEntry entry) : base(entry)
         {
-            AllowedToAct = new GroupMember[0];
+            AllowedToAct = new GenericMember[0];
             AllowedToDelegate = new string[0];
             Sessions = new Session[0];
             PingFailed = false;
-            LocalAdmins = new GroupMember[0];
-            RemoteDesktopUsers = new GroupMember[0];
-            DcomUsers = new GroupMember[0];
-            PSRemoteUsers= new GroupMember[0];
+            LocalAdmins = new GenericMember[0];
+            RemoteDesktopUsers = new GenericMember[0];
+            DcomUsers = new GenericMember[0];
+            PSRemoteUsers= new GenericMember[0];
         }
 
         [JsonIgnore]
@@ -28,19 +28,19 @@ namespace SharpHound3.LdapWrappers
 
         public string[] AllowedToDelegate { get; set; }
 
-        public GroupMember[] AllowedToAct { get; set; }
+        public GenericMember[] AllowedToAct { get; set; }
 
         public string PrimaryGroupSid { get; set; }
 
         public Session[] Sessions { get; set; }
 
-        public GroupMember[] LocalAdmins { get; set; }
+        public GenericMember[] LocalAdmins { get; set; }
 
-        public GroupMember[] RemoteDesktopUsers { get; set; }
+        public GenericMember[] RemoteDesktopUsers { get; set; }
 
-        public GroupMember[] DcomUsers { get; set; }
+        public GenericMember[] DcomUsers { get; set; }
 
-        public GroupMember[] PSRemoteUsers { get; set; }
+        public GenericMember[] PSRemoteUsers { get; set; }
 
         [JsonIgnore]
         public bool PingFailed { get; set; }

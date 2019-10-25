@@ -12,9 +12,9 @@ namespace SharpHound3.LdapWrappers
     {
         internal Group(SearchResultEntry entry) : base(entry)
         {
-            Members = new GroupMember[0];
+            Members = new GenericMember[0];
         }
 
-        public GroupMember[] Members { get; set; }
+        public GenericMember[] Members { get; set; }
     }
 }

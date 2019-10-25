@@ -79,7 +79,7 @@
     <Compile Include="Enums\LdapTypeEnum.cs" />
     <Compile Include="JSON\ComputerError.cs" />
     <Compile Include="JSON\GPLink.cs" />
-    <Compile Include="JSON\GroupMember.cs" />
+    <Compile Include="JSON\GenericMember.cs" />
     <Compile Include="JSON\Session.cs" />
     <Compile Include="JSON\SPNTarget.cs" />
     <Compile Include="LdapBuilder.cs" />

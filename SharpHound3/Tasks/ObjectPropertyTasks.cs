@@ -107,7 +107,7 @@ namespace SharpHound3.Tasks
 
             var allowedToAct = result.GetPropertyAsBytes("msDS-AllowedToActOnBehalfOfOtherIdentity");
 
-            var allowedToActPrincipals = new List<GroupMember>();
+            var allowedToActPrincipals = new List<GenericMember>();
 
             if (allowedToAct != null)
             {
@@ -129,7 +129,7 @@ namespace SharpHound3.Tasks
                     }
 
 
-                    allowedToActPrincipals.Add(new GroupMember
+                    allowedToActPrincipals.Add(new GenericMember
                     {
                         MemberType = type,
                         MemberId = sid

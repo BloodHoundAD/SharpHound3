@@ -31,6 +31,11 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Wraps the NetWkstaUserEnum API call in a timeout
+        /// </summary>
+        /// <param name="computer"></param>
+        /// <returns></returns>
         private static async Task<List<Session>> GetLoggedOnUsersAPI(Computer computer)
         {
             var resumeHandle = 0;
@@ -44,10 +49,18 @@ namespace SharpHound3.Tasks
                 var task = Task.Run(() => NetWkstaUserEnum(computer.APIName, 1, out ptrInfo,
                     -1, out entriesRead, out _, ref resumeHandle));
 
-                var success = task.Wait(TimeSpan.FromSeconds(10));
+                if (await Task.WhenAny(task, Task.Delay(10000)) != task)
+                {
+                    if (Options.Instance.DumpComputerStatus)
+                        OutputTasks.AddComputerStatus(new ComputerStatus
+                        {
+                            ComputerName = computer.DisplayName,
+                            Status = "Timeout",
+                            Task = "NetWkstaUserEnum"
+                        });
 
-                if (!success)
                     return sessionList;
+                }
 
                 var taskResult = task.Result;
                 if (taskResult != 0 && taskResult != 234)
@@ -61,8 +74,7 @@ namespace SharpHound3.Tasks
                         });
                     return sessionList;
                 }
-                    
-
+                
                 var iterator = ptrInfo;
 
                 if (Options.Instance.DumpComputerStatus)
@@ -122,10 +134,11 @@ namespace SharpHound3.Tasks
             if (Options.Instance.NoRegistryLoggedOn)
                 yield break;
 
+            RegistryKey key = null;
             IEnumerable<string> filteredKeys;
             try
             {
-                var key = RegistryKey.OpenRemoteBaseKey(RegistryHive.Users, computer.APIName);
+                key = RegistryKey.OpenRemoteBaseKey(RegistryHive.Users, computer.APIName);
 
                 filteredKeys = key.GetSubKeyNames().Where(subkey => SidRegex.IsMatch(subkey));
             }
@@ -139,6 +152,10 @@ namespace SharpHound3.Tasks
                         Task = "RegistryLoggedOn"
                     });
                 yield break;
+            }
+            finally
+            {
+                key?.Dispose();
             }
 
             foreach (var sid in filteredKeys)

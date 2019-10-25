@@ -67,7 +67,7 @@ namespace SharpHound3.Tasks
 
         private static async Task GetGroupMembership(Group group)
         {
-            var finalMembers = new List<GroupMember>();
+            var finalMembers = new List<GenericMember>();
             var searchResult = group.SearchResult;
 
             AppCache.Add(group.DistinguishedName, new ResolvedPrincipal
@@ -113,12 +113,12 @@ namespace SharpHound3.Tasks
         /// </summary>
         /// <param name="distinguishedName"></param>
         /// <returns></returns>
-        private static async Task<GroupMember> TranslateDistinguishedName(string distinguishedName)
+        private static async Task<GenericMember> TranslateDistinguishedName(string distinguishedName)
         {
             //Check cache to see if we have the item in there first.
             if (AppCache.GetPrincipal(distinguishedName, out var resolved))
             {
-                return new GroupMember
+                return new GenericMember
                 {
                     MemberType = resolved.ObjectType,
                     MemberId = resolved.ObjectIdentifier
@@ -142,7 +142,7 @@ namespace SharpHound3.Tasks
         /// </summary>
         /// <param name="distinguishedName"></param>
         /// <returns></returns>
-        private static async Task<GroupMember> TranslateDistinguishedNameWithLdap(string distinguishedName)
+        private static async Task<GenericMember> TranslateDistinguishedNameWithLdap(string distinguishedName)
         {
             var domain = Helpers.DistinguishedNameToDomain(distinguishedName);
             var searcher = Helpers.GetDirectorySearcher(domain);
@@ -163,7 +163,7 @@ namespace SharpHound3.Tasks
 
                     if (searchResult == null)
                     {
-                        return new GroupMember
+                        return new GenericMember
                         {
                             MemberType = LdapTypeEnum.Unknown,
                             MemberId = distinguishedName
@@ -171,7 +171,7 @@ namespace SharpHound3.Tasks
                     }
 
                     type = searchResult.GetLdapType();
-                    return new GroupMember
+                    return new GenericMember
                     {
                         MemberType = type,
                         MemberId = sid
@@ -181,14 +181,14 @@ namespace SharpHound3.Tasks
                 //Check if its a common principal
                 if (CommonPrincipal.GetCommonSid(sid, out var commonPrincipal))
                 {
-                    return new GroupMember
+                    return new GenericMember
                     {
                         MemberId = Helpers.ConvertCommonSid(sid, domain),
                         MemberType = commonPrincipal.Type
                     };
                 }
 
-                return new GroupMember{
+                return new GenericMember{
                     MemberType = LdapTypeEnum.Unknown,
                     MemberId = sid
                 };
@@ -201,7 +201,7 @@ namespace SharpHound3.Tasks
 
             if (searchResult == null)
             {
-                return new GroupMember
+                return new GenericMember
                 {
                     MemberId = distinguishedName,
                     MemberType= LdapTypeEnum.Unknown
@@ -209,7 +209,7 @@ namespace SharpHound3.Tasks
             }
 
             type = searchResult.GetLdapType();
-            return new GroupMember
+            return new GenericMember
             {
                 MemberId = searchResult.GetSid(),
                 MemberType = type

@@ -26,6 +26,11 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Wraps the NetSessionEnum API call with a timeout and parses the 
+        /// </summary>
+        /// <param name="computer"></param>
+        /// <returns></returns>
         private static async Task<List<Session>> GetNetSessions(Computer computer)
         {
             var resumeHandle = IntPtr.Zero;
@@ -41,10 +46,17 @@ namespace SharpHound3.Tasks
                 var task = Task.Run(() => NetSessionEnum(computer.APIName, null, null, 10,
                     out ptrInfo, -1, out entriesRead, out _, ref resumeHandle));
 
-                var success = task.Wait(TimeSpan.FromSeconds(10));
-
-                if (!success)
+                if (await Task.WhenAny(task, Task.Delay(10000)) != task)
+                {
+                    if (Options.Instance.DumpComputerStatus)
+                        OutputTasks.AddComputerStatus(new ComputerStatus
+                        {
+                            ComputerName = computer.DisplayName,
+                            Status = "Timeout",
+                            Task = "NetSessionEnum"
+                        });
                     return sessionList;
+                }
 
                 var taskResult = task.Result;
 
@@ -109,7 +121,7 @@ namespace SharpHound3.Tasks
 
                     //Try converting the username to a SID
                     var searcher = Helpers.GetDirectorySearcher(computer.Domain);
-                    var sids = searcher.LookupUserInGC(sessionUsername);
+                    var sids = await searcher.LookupUserInGC(sessionUsername);
                     if (sids.Length > 0)
                     {
                         foreach (var sid in sids)

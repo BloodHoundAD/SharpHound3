@@ -277,8 +277,13 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
-
-        private static bool IsAceInherited(ActiveDirectoryAccessRule ace, string guid)
+        /// <summary>
+        /// Helper function to determine if an ACE actually applies to the object through inheritance
+        /// </summary>
+        /// <param name="ace"></param>
+        /// <param name="guid"></param>
+        /// <returns></returns>
+        private static bool IsAceInherited(ObjectAccessRule ace, string guid)
         {
             //Ace is inherited
             if (ace.IsInherited)
@@ -299,6 +304,12 @@ namespace SharpHound3.Tasks
             return true;
         }
 
+        /// <summary>
+        /// Applies pre-processing to the SID on the ACE converting sids as necessary
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <param name="objectDomain"></param>
+        /// <returns></returns>
         private static string ProcessACESID(string sid, string objectDomain)
         { 
             //Ignore Local System/Creator Owner/Principal Self
@@ -314,7 +325,7 @@ namespace SharpHound3.Tasks
 
             if (CommonPrincipal.GetCommonSid(sid, out _))
             {
-                sid = $"{objectDomain}-{sid}";
+                sid = Helpers.ConvertCommonSid(sid, objectDomain);
             }
 
             return sid;

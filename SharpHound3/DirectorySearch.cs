@@ -34,7 +34,7 @@ namespace SharpHound3
             CreateSchemaMap();
         }
 
-        internal string[] LookupUserInGC(string username)
+        internal async Task<string[]> LookupUserInGC(string username)
         {
             if (Cache.Instance.GetGlobalCatalogMatches(username, out var sids))
             {
@@ -45,40 +45,54 @@ namespace SharpHound3
             try
             {
                 var searchRequest = CreateSearchRequest($"(&(samAccountType=805306368)(samaccountname={username}))",
-                    SearchScope.Subtree, new[] {"objectsid"});
+                    SearchScope.Subtree, new[] { "objectsid" });
 
-                SearchResponse searchResponse;
+                var iAsyncResult = connection.BeginSendRequest(searchRequest,
+                    PartialResultProcessing.NoPartialResultSupport, null, null);
+
+                var task = Task<SearchResponse>.Factory.FromAsync(iAsyncResult,
+                    x => (SearchResponse) connection.EndSendRequest(x));
+
                 try
                 {
-                    searchResponse = (SearchResponse) connection.SendRequest(searchRequest);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("\nUnexpected exception occured:\n\t{0}: {1}",
-                        e.GetType().Name, e.Message);
-                    return new string[0];
-                }
+                    var response = await task;
 
-                if (searchResponse.Entries.Count == 0)
-                {
-                    sids = new string[0];
-                    Cache.Instance.Add(username, sids);
-                    return sids;
-                }
+                    if (response == null)
+                    {
+                        sids = new string[0];
+                        Cache.Instance.Add(username, sids);
+                        return sids;
+                    }
+
+                    if (response.Entries.Count == 0)
+                    {
+                        sids = new string[0];
+                        Cache.Instance.Add(username, sids);
+                        return sids;
+                    }
+
+                    var results = new List<string>();
+
                     
 
-                var results = new List<string>();
+                    foreach (SearchResultEntry entry in response.Entries)
+                    {
+                        var sid = entry.GetSid();
+                        if (sid != null)
+                        {
+                            results.Add(sid);
+                        }
+                    }
 
-                foreach (SearchResultEntry entry in searchResponse.Entries)
-                {
-                    var sid = entry.GetSid();
-                    if (sid != null)
-                        results.Add(sid);
+                    sids = results.ToArray();
+                    Cache.Instance.Add(username, sids);
+                    return sids;
+
                 }
-
-                sids = results.ToArray();
-                Cache.Instance.Add(username, sids);
-                return sids;
+                catch
+                {
+                    return null;
+                }
             }
             finally
             {
