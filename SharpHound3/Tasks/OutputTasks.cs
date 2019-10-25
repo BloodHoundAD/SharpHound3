@@ -5,18 +5,19 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Timers;
 using ICSharpCode.SharpZipLib.Zip;
 using Newtonsoft.Json;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
+using Group = SharpHound3.LdapWrappers.Group;
 
 namespace SharpHound3.Tasks
 {
     internal class OutputTasks
     {
-        private static readonly BlockingCollection<ComputerError> ComputerErrorQueue = new BlockingCollection<ComputerError>();
         private static readonly List<string> UsedFileNames = new List<string>();
         private static readonly Lazy<JsonFileWriter> UserOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
         private static readonly Lazy<JsonFileWriter> GroupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
@@ -27,20 +28,31 @@ namespace SharpHound3.Tasks
         private static int _lastCount = 0;
         private static int _currentCount = 0;
         private static Timer _statusTimer;
+        private static Stopwatch _runTimer;
+        private static ConcurrentDictionary<string, int> ComputerStatusCount = new ConcurrentDictionary<string, int>();
+        private static readonly BlockingCollection<ComputerStatus> ComputerStatusQueue = new BlockingCollection<ComputerStatus>();
 
         internal static void StartOutputTimer()
         {
-            Console.WriteLine(
-                $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount}) -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM");
+            PrintStatus();
             _statusTimer = new Timer(Options.Instance.StatusInterval);
+            _runTimer =new Stopwatch();
+            _runTimer.Start();
             _statusTimer.Elapsed += (sender, e) =>
             {
-                Console.WriteLine(
-                    $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount}) -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM");
+                PrintStatus();
                 _lastCount = _currentCount;
             };
             _statusTimer.AutoReset = true;
             _statusTimer.Start();
+        }
+
+        internal static void PrintStatus()
+        {
+            Console.WriteLine(
+                _runTimer != null
+                    ? $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount} {(float) _currentCount / (_runTimer.ElapsedMilliseconds / 1000)})/s -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM"
+                    : $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount}) -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM");
         }
 
         internal static void WriteJsonOutput(LdapWrapper wrapper)
@@ -72,6 +84,8 @@ namespace SharpHound3.Tasks
 
         internal static void CompleteOutput()
         {
+            Console.WriteLine($"Enumeration finished in {_runTimer.Elapsed}");
+            _runTimer.Stop();
             if (UserOutput.IsValueCreated)
                 UserOutput.Value.CloseWriter();
             if (ComputerOutput.IsValueCreated)
@@ -146,10 +160,10 @@ namespace SharpHound3.Tasks
                 zipStream.Finish();
             }
 
-            if (Options.Instance.DumpComputerErrors)
-                CompleteErrorOutput();
-
             Console.WriteLine("Finished compressing files. Happy graphing!");
+
+            if (Options.Instance.DumpComputerStatus)
+                CompleteComputerStatusOutput();
         }
 
         private static string GenerateZipPassword()
@@ -164,16 +178,16 @@ namespace SharpHound3.Tasks
             return builder.ToString();
         }
 
-        internal static Task StartComputerErrorTask()
+        internal static Task StartComputerStatusTask()
         {
             return Task.Factory.StartNew(() =>
             {
-                var fileName = Helpers.ResolveFileName("computererror", "csv", true);
+                var fileName = Helpers.ResolveFileName("computerstatus", "csv", true);
                 var count = 0;
                 using (var writer = new StreamWriter(fileName, false))
                 {
-                    writer.WriteLine("ComputerName, Task, Error");
-                    foreach (var error in ComputerErrorQueue.GetConsumingEnumerable())
+                    writer.WriteLine("ComputerName, Task, Status");
+                    foreach (var error in ComputerStatusQueue.GetConsumingEnumerable())
                     {
                         writer.WriteLine(error.ToCsv());
                         count++;
@@ -186,14 +200,23 @@ namespace SharpHound3.Tasks
             }, TaskCreationOptions.LongRunning);
         }
 
-        internal static void AddComputerError(ComputerError error)
+        internal static void AddComputerStatus(ComputerStatus status)
         {
-            ComputerErrorQueue.Add(error);
+            ComputerStatusQueue.Add(status);
+            var hash = $"{status.Task}-{Regex.Replace(status.Status, @"\t|\n|\r", "")}";
+            ComputerStatusCount.AddOrUpdate(hash, 1, (id, count) => count + 1);
         }
 
-        private static void CompleteErrorOutput()
+        private static void CompleteComputerStatusOutput()
         {
-            ComputerErrorQueue.CompleteAdding();
+            ComputerStatusQueue.CompleteAdding();
+            Console.WriteLine();
+            Console.WriteLine("-------Computer Status Count-------");
+            foreach (var key in ComputerStatusCount)
+            {
+                Console.WriteLine($"{key.Key}: {key.Value}");
+            }
+            Console.WriteLine("-----------------------------------");
         }
 
         /// <summary>
@@ -231,7 +254,7 @@ namespace SharpHound3.Tasks
                 JsonWriter.WritePropertyName("type");
                 JsonWriter.WriteValue(_baseFileName);
                 JsonWriter.WritePropertyName("version");
-                JsonWriter.WriteValue(2);
+                JsonWriter.WriteValue(3);
                 JsonWriter.WriteEndObject();
                 JsonWriter.Close();
             }

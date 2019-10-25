@@ -7,6 +7,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
+using SharpHound3.Enums;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
 
@@ -30,7 +31,7 @@ namespace SharpHound3.Tasks
             };
         }
 
-        internal static LdapWrapper ProcessDACL(LdapWrapper wrapper)
+        internal static async Task<LdapWrapper> ProcessDACL(LdapWrapper wrapper)
         {
             var aces = new List<ACL>();
             var ntSecurityDescriptor = wrapper.SearchResult.GetPropertyAsBytes("ntsecuritydescriptor");
@@ -73,8 +74,20 @@ namespace SharpHound3.Tasks
                 if (principalSid == null)
                     continue;
 
+                LdapTypeEnum principalType;
+                if (CommonPrincipal.GetCommonSid(principalSid, out var commonPrincipal))
+                {
+                    principalSid = Helpers.ConvertCommonSid(principalSid, wrapper.Domain);
+                    principalType = commonPrincipal.Type;
+                }
+                else
+                {
+                    principalType = await Helpers.LookupSidType(principalSid);
+                }
+
                 var rights = ace.ActiveDirectoryRights;
                 var objectAceType = ace.ObjectType.ToString();
+                
 
                 if (rights.HasFlag(ActiveDirectoryRights.GenericAll))
                 {
@@ -84,7 +97,8 @@ namespace SharpHound3.Tasks
                         {
                             PrincipalSID = principalSid,
                             RightName = "GenericAll",
-                            AceType = ""
+                            AceType = "",
+                            PrincipalType = principalType
                         });
                     }
                     //GenericAll includes every other right, and we dont want to duplicate. So continue in the loop
@@ -98,7 +112,8 @@ namespace SharpHound3.Tasks
                     {
                         PrincipalSID = principalSid,
                         AceType = "",
-                        RightName = "WriteDacl"
+                        RightName = "WriteDacl",
+                        PrincipalType = principalType
                     });
                 }
 
@@ -108,7 +123,8 @@ namespace SharpHound3.Tasks
                     {
                         RightName = "WriteOwner",
                         AceType = "",
-                        PrincipalSID = principalSid
+                        PrincipalSID = principalSid,
+                        PrincipalType = principalType
                     });
                 }
 
@@ -125,7 +141,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "GetChanges",
                                     RightName = "ExtendedRight",
-                                    PrincipalSID = principalSid
+                                    PrincipalSID = principalSid,
+                                    PrincipalType = principalType
                                 });
                                 break;
                             case "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2":
@@ -133,7 +150,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "GetChangesAll",
                                     RightName = "ExtendedRight",
-                                    PrincipalSID = principalSid
+                                    PrincipalSID = principalSid,
+                                    PrincipalType = principalType
                                 });
                                 break;
                             case AllGuid:
@@ -142,7 +160,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "All",
                                     RightName = "ExtendedRight",
-                                    PrincipalSID = principalSid
+                                    PrincipalSID = principalSid,
+                                    PrincipalType = principalType
                                 });
                                 break;
                         }
@@ -155,7 +174,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "User-Force-Change-Password",
                                     PrincipalSID = principalSid,
-                                    RightName = "ExtendedRight"
+                                    RightName = "ExtendedRight",
+                                    PrincipalType = principalType
                                 });
                                 break;
                             case AllGuid:
@@ -164,7 +184,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "All",
                                     PrincipalSID = principalSid,
-                                    RightName = "ExtendedRight"
+                                    RightName = "ExtendedRight",
+                                    PrincipalType = principalType
                                 });
                                 break;
                         }
@@ -179,7 +200,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "",
                                     RightName = "ExtendedRight",
-                                    PrincipalSID = principalSid
+                                    PrincipalSID = principalSid,
+                                    PrincipalType = principalType
                                 });
                             }else if (mappedGuid != null && mappedGuid == "ms-Mcs-AdmPwd")
                             {
@@ -187,7 +209,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "",
                                     RightName = "ReadLAPSPassword",
-                                    PrincipalSID = principalSid
+                                    PrincipalSID = principalSid,
+                                    PrincipalType = principalType
                                 });
                             }
                         }
@@ -205,7 +228,8 @@ namespace SharpHound3.Tasks
                         {
                             AceType = "",
                             RightName = "GenericWrite",
-                            PrincipalSID = principalSid
+                            PrincipalSID = principalSid,
+                            PrincipalType = principalType
                         });
                     }
 
@@ -217,7 +241,8 @@ namespace SharpHound3.Tasks
                             {
                                 AceType = "WriteSPN",
                                 RightName = "WriteProperty",
-                                PrincipalSID = principalSid
+                                PrincipalSID = principalSid,
+                                PrincipalType = principalType
                             });
                         }
                     }else if (wrapper is Group)
@@ -228,7 +253,8 @@ namespace SharpHound3.Tasks
                             {
                                 AceType = "AddMember",
                                 RightName = "WriteProperty",
-                                PrincipalSID = principalSid
+                                PrincipalSID = principalSid,
+                                PrincipalType = principalType
                             });
                         }
                     }else if (wrapper is Computer)
@@ -239,7 +265,8 @@ namespace SharpHound3.Tasks
                             {
                                 AceType = "AllowedToAct",
                                 RightName = "WriteProperty",
-                                PrincipalSID = principalSid
+                                PrincipalSID = principalSid,
+                                PrincipalType = principalType
                             });
                         }
                     }

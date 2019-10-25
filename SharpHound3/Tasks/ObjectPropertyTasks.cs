@@ -6,6 +6,7 @@ using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using SharpHound3.Enums;
+using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
 
 namespace SharpHound3.Tasks
@@ -14,7 +15,7 @@ namespace SharpHound3.Tasks
     {
         private static readonly DateTime WindowsEpoch = new DateTime(1970, 1, 1);
 
-        internal static LdapWrapper ResolveObjectProperties(LdapWrapper wrapper)
+        internal static async Task<LdapWrapper> ResolveObjectProperties(LdapWrapper wrapper)
         {
             var result = wrapper.SearchResult;
             wrapper.Properties.Add("description", result.GetProperty("description"));
@@ -24,10 +25,10 @@ namespace SharpHound3.Tasks
                 ParseDomainProperties(domain);
             }else if (wrapper is Computer computer)
             {
-                ParseComputerProperties(computer);
+                await ParseComputerProperties(computer);
             }else if (wrapper is User user)
             {
-                ParseUserProperties(user);
+                await ParseUserProperties(user);
             }else if (wrapper is GPO gpo)
             {
                 ParseGPOProperties(gpo);
@@ -70,7 +71,7 @@ namespace SharpHound3.Tasks
             //var result = wrapper.SearchResult;
         }
 
-        private static void ParseComputerProperties(Computer wrapper)
+        private static async Task ParseComputerProperties(Computer wrapper)
         {
             var result = wrapper.SearchResult;
             var userAccountControl = result.GetProperty("useraccountcontrol");
@@ -98,7 +99,7 @@ namespace SharpHound3.Tasks
 
                 foreach (var computerName in delegates)
                 {
-                    var resolvedHost = Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
+                    var resolvedHost = await Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
                     trustedToAuthComputers.Add(resolvedHost);
                 }
             }
@@ -106,7 +107,7 @@ namespace SharpHound3.Tasks
 
             var allowedToAct = result.GetPropertyAsBytes("msDS-AllowedToActOnBehalfOfOtherIdentity");
 
-            var allowedToActPrincipals = new List<string>();
+            var allowedToActPrincipals = new List<GroupMember>();
 
             if (allowedToAct != null)
             {
@@ -116,9 +117,23 @@ namespace SharpHound3.Tasks
                     typeof(SecurityIdentifier)))
                 {
                     var sid = ace.IdentityReference.Value;
-                    sid = Helpers.ConvertCommonSid(sid, wrapper.Domain);
+                    LdapTypeEnum type;
+                    if (CommonPrincipal.GetCommonSid(sid, out var principal))
+                    {
+                        type = principal.Type;
+                        sid = Helpers.ConvertCommonSid(sid, wrapper.Domain);
+                    }
+                    else
+                    {
+                        type = await Helpers.LookupSidType(sid);
+                    }
 
-                    allowedToActPrincipals.Add(sid);
+
+                    allowedToActPrincipals.Add(new GroupMember
+                    {
+                        MemberType = type,
+                        MemberId = sid
+                    });
                 }
             }
 
@@ -179,7 +194,7 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("functionallevel", func);
         }
 
-        private static void ParseUserProperties(User wrapper)
+        private static async Task ParseUserProperties(User wrapper)
         {
             var result = wrapper.SearchResult;
 
@@ -217,7 +232,7 @@ namespace SharpHound3.Tasks
 
                 foreach (var computerName in delegates)
                 {
-                    var resolvedHost = Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
+                    var resolvedHost = await Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
                     trustedToAuthComputers.Add(resolvedHost);
                 }
             }

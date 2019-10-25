@@ -13,22 +13,22 @@ namespace SharpHound3.Tasks
 {
     internal class LocalGroupTasks
     {
-        internal static LdapWrapper GetLocalGroupMembers(LdapWrapper wrapper)
+        internal static async Task<LdapWrapper> GetLocalGroupMembers(LdapWrapper wrapper)
         {
             if (wrapper is Computer computer && !computer.PingFailed)
             {
                 var opts = Options.Instance.ResolvedCollectionMethods;
                 if ((opts & CollectionMethodResolved.DCOM) != 0)
-                    computer.DcomUsers = GetNetLocalGroupMembers(computer, LocalGroupRids.DcomUsers).ToArray();
+                    computer.DcomUsers = (await GetNetLocalGroupMembers(computer, LocalGroupRids.DcomUsers)).ToArray();
 
                 if ((opts & CollectionMethodResolved.LocalAdmin) != 0)
-                    computer.LocalAdmins = GetNetLocalGroupMembers(computer, LocalGroupRids.Administrators).ToArray();
+                    computer.LocalAdmins = (await GetNetLocalGroupMembers(computer, LocalGroupRids.Administrators)).ToArray();
 
                 if ((opts & CollectionMethodResolved.RDP) != 0)
-                    computer.RemoteDesktopUsers = GetNetLocalGroupMembers(computer, LocalGroupRids.RemoteDesktopUsers).ToArray();
+                    computer.RemoteDesktopUsers = (await GetNetLocalGroupMembers(computer, LocalGroupRids.RemoteDesktopUsers)).ToArray();
 
                 if ((opts & CollectionMethodResolved.PSRemote) != 0)
-                    computer.PSRemoteUsers = GetNetLocalGroupMembers(computer, LocalGroupRids.PsRemote).ToArray();
+                    computer.PSRemoteUsers = (await GetNetLocalGroupMembers(computer, LocalGroupRids.PsRemote)).ToArray();
             }
 
             return wrapper;
@@ -42,98 +42,135 @@ namespace SharpHound3.Tasks
             return bytes;
         });
 
-        private static IEnumerable<GroupMember> GetNetLocalGroupMembers(Computer computer, LocalGroupRids rid)
+        private static async Task<List<GroupMember>> GetNetLocalGroupMembers(Computer computer, LocalGroupRids rid)
         {
             var sids = new IntPtr[0];
-            var machineSid = "DUMMYSTRINGNEVERMATCH";
 
-            var task = Task.Run(() => CallLocalGroupApi(computer, rid, out sids, out machineSid));
+            var task = Task.Run(() => CallLocalGroupApi(computer, rid, out sids));
 
             var success = task.Wait(TimeSpan.FromSeconds(10));
 
+            var groupMemberList = new List<GroupMember>();
+
             if (!success)
             {
-                OutputTasks.AddComputerError(new ComputerError
+                OutputTasks.AddComputerStatus(new ComputerStatus
                 {
                     ComputerName = computer.DisplayName,
-                    Error = "Timeout",
+                    Status = "Timeout",
                     Task = $"GetNetLocalGroup-{rid}"
                 });
-                yield break;
+                return groupMemberList;
             }
 
             var taskResult = task.Result;
             if (!taskResult)
-                yield break;
+                return groupMemberList;
 
-            if (Options.Instance.DumpComputerErrors)
-                OutputTasks.AddComputerError(new ComputerError
+            if (Options.Instance.DumpComputerStatus)
+                OutputTasks.AddComputerStatus(new ComputerStatus
                 {
                     ComputerName = computer.DisplayName,
-                    Error = "Success",
+                    Status = "Success",
                     Task = $"GetNetLocaGroup-{rid}"
                 });
 
-            foreach (var baseSid in sids)
+            //Take our pointers to sids and convert them into string sids for matching
+            var convertedSids = new List<string>();
+            for (var i = 0; i < sids.Length; i++)
             {
-                string sid;
-                LdapTypeEnum type;
                 try
                 {
-                    sid = new SecurityIdentifier(baseSid).Value;
-                    if (sid.StartsWith(machineSid))
-                        continue;
-                    
-                    if (CommonPrincipal.GetCommonSid(sid, out var common))
-                    {
-                        sid = Helpers.ConvertCommonSid(sid, null);
-                        type = common.Type;
-                    }
-                    else
-                    {
-                        type = Helpers.LookupSidType(sid);
-                    }
+                    var sid = new SecurityIdentifier(sids[i]).Value;
+                    convertedSids.Add(sid);
                 }
                 catch
                 {
+                    // ignored
+                }
+                finally
+                {
+                    //Set the IntPtr to zero, so we can GC those
+                    sids[i] = IntPtr.Zero;
+                }
+            }
+            //Null out sids, so garbage collection takes care of it
+            sids = null;
+
+            //Extract the domain SID from the computer's sid, to avoid creating more SecurityIdentifier objects
+            var domainSid = computer.ObjectIdentifier.Substring(0, computer.ObjectIdentifier.LastIndexOf('-'));
+            string machineSid;
+            // The first account in our list should always be the default RID 500 for the machine, but we'll take some extra precautions
+            try
+            {
+                machineSid = convertedSids.First(x => x.EndsWith("-500") && !x.StartsWith(domainSid));
+            }
+            catch
+            {
+                machineSid = "DUMMYSTRING";
+            }
+
+            foreach (var sid in convertedSids)
+            {
+                if (sid.StartsWith(machineSid))
                     continue;
+
+                LdapTypeEnum type;
+                string finalSid = sid;
+                if (CommonPrincipal.GetCommonSid(finalSid, out var common))
+                {
+                    finalSid = Helpers.ConvertCommonSid(sid, null);
+                    type = common.Type;
+                }
+                else
+                {
+                    type = await Helpers.LookupSidType(sid);
                 }
 
-                yield return new GroupMember
+                groupMemberList.Add(new GroupMember
                 {
                     MemberType = type,
-                    MemberName = sid
-                };
+                    MemberId = finalSid
+                });
             }
+
+            return groupMemberList;
         }
 
-        private static bool CallLocalGroupApi(Computer computer, LocalGroupRids rid, out IntPtr[] sids, out string machineSid)
+        /// <summary>
+        /// Modified version of GetNetLocalGroupMembers which eliminates several unnecessary LSA/SAMRPC calls
+        /// </summary>
+        /// <param name="computer"></param>
+        /// <param name="rid"></param>
+        /// <param name="sids"></param>
+        /// <returns></returns>
+        private static bool CallLocalGroupApi(Computer computer, LocalGroupRids rid, out IntPtr[] sids)
         {
+            //Initialize pointers for later
             var serverHandle = IntPtr.Zero;
             var domainHandle = IntPtr.Zero;
             var aliasHandle = IntPtr.Zero;
-            var machineSidPtr = IntPtr.Zero;
             var members = IntPtr.Zero;
-
+            sids = new IntPtr[0];
+            
+            //Create some objects required for SAMRPC calls
             var server = new UNICODE_STRING(computer.APIName);
             var objectAttributes = new OBJECT_ATTRIBUTES();
-            NtStatus status;
-            sids = new IntPtr[0];
-            machineSid = null;
 
             try
             {
+                //Step 1: Call SamConnect to open a handle to the computer's SAM
                 //0x1 = SamServerLookupDomain, 0x20 = SamServerConnect
-                status = SamConnect(ref server, out serverHandle, 0x1 | 0x20, ref objectAttributes);
+                var status = SamConnect(ref server, out serverHandle, 0x1 | 0x20, ref objectAttributes);
 
                 switch (status)
                 {
                     case NtStatus.StatusRpcServerUnavailable:
-                        if (Options.Instance.DumpComputerErrors)
-                            OutputTasks.AddComputerError(new ComputerError
+                        if (Options.Instance.DumpComputerStatus)
+                            OutputTasks.AddComputerStatus(new ComputerStatus
                             {
                                 ComputerName = computer.DisplayName,
-                                Error = status.ToString(),
+                                Status = status.ToString(),
                                 Task = $"GetNetLocalGroup-{rid}"
                             });
                         
@@ -141,73 +178,64 @@ namespace SharpHound3.Tasks
                     case NtStatus.StatusSuccess:
                         break;
                     default:
-                        if (Options.Instance.DumpComputerErrors)
-                            OutputTasks.AddComputerError(new ComputerError
+                        if (Options.Instance.DumpComputerStatus)
+                            OutputTasks.AddComputerStatus(new ComputerStatus
                             {
                                 ComputerName = computer.DisplayName,
-                                Error = status.ToString(),
+                                Status = status.ToString(),
                                 Task = $"GetNetLocalGroup-{rid}"
                             });
                         return false;
                 }
 
-                try
-                {
-                    var samAccountName = new UNICODE_STRING(computer.SamAccountName);
-                    SamLookupDomainInSamServer(serverHandle, ref samAccountName, out machineSidPtr);
-                    machineSid = new SecurityIdentifier(machineSidPtr).Value;
-                }
-                catch
-                {
-                    machineSid = "DUMMYSTRINGNEVERMATCH";
-                }
-
+                //Step 2 - Open the built in domain, which is identified by the SID S-1-5-32
                 //0x200 = Lookup
                 status = SamOpenDomain(serverHandle, 0x200, LocalSidBytes.Value, out domainHandle);
 
                 if (status != NtStatus.StatusSuccess)
                 {
-                    if (Options.Instance.DumpComputerErrors)
-                        OutputTasks.AddComputerError(new ComputerError
+                    if (Options.Instance.DumpComputerStatus)
+                        OutputTasks.AddComputerStatus(new ComputerStatus
                         {
                             ComputerName = computer.DisplayName,
-                            Error = status.ToString(),
+                            Status = status.ToString(),
                             Task = $"GetNetLocalGroup-{rid}"
                         });
                     return false;
                 }
 
-
+                //Step 3 - Open the alias that corresponds to the group we want to enumerate.
                 //0x4 = ListMembers
                 status = SamOpenAlias(domainHandle, 0x4, (int)rid, out aliasHandle);
 
                 if (status != NtStatus.StatusSuccess)
                 {
-                    if (Options.Instance.DumpComputerErrors)
-                        OutputTasks.AddComputerError(new ComputerError
+                    if (Options.Instance.DumpComputerStatus)
+                        OutputTasks.AddComputerStatus(new ComputerStatus
                         {
                             ComputerName = computer.DisplayName,
-                            Error = status.ToString(),
+                            Status = status.ToString(),
                             Task = $"GetNetLocalGroup-{rid}"
                         });
 
                 }
 
-
+                //Step 4 - Get the members of the alias we opened in step 3. 
                 status = SamGetMembersInAlias(aliasHandle, out members, out var count);
 
                 if (status != NtStatus.StatusSuccess)
                 {
-                    if (Options.Instance.DumpComputerErrors)
-                        OutputTasks.AddComputerError(new ComputerError
+                    if (Options.Instance.DumpComputerStatus)
+                        OutputTasks.AddComputerStatus(new ComputerStatus
                         {
                             ComputerName = computer.DisplayName,
-                            Error = status.ToString(),
+                            Status = status.ToString(),
                             Task = $"GetNetLocalGroup-{rid}"
                         });
                     return false;
                 }
 
+                //If we didn't get any objects, just return false
                 if (count == 0)
                 {
                     return false;
@@ -221,6 +249,7 @@ namespace SharpHound3.Tasks
             }
             finally
             {
+                //Free memory from handles acquired during the process
                 if (serverHandle != IntPtr.Zero)
                     SamCloseHandle(serverHandle);
                 if (domainHandle != IntPtr.Zero)
@@ -228,8 +257,6 @@ namespace SharpHound3.Tasks
                 if (aliasHandle != IntPtr.Zero)
                     SamCloseHandle(aliasHandle);
 
-                if (machineSidPtr != IntPtr.Zero)
-                    SamFreeMemory(machineSidPtr);
                 if (members != IntPtr.Zero)
                     SamFreeMemory(members);
             }
@@ -273,6 +300,10 @@ namespace SharpHound3.Tasks
 
         [DllImport("samlib.dll")]
         internal static extern NtStatus SamFreeMemory(IntPtr pointer);
+
+        [DllImport("samlib.dll")]
+        internal static extern NtStatus SamEnumerateDomainsInSamServer(IntPtr serverHandle, ref int enumerationContext,
+            out IntPtr domains, int PrefMaxLen, out int count);
         #endregion
 
         #region PInvoke Structs/Enums
@@ -287,7 +318,8 @@ namespace SharpHound3.Tasks
             StatusAccessDenied = unchecked((int)0xC0000022),
             StatusObjectTypeMismatch = unchecked((int)0xC0000024),
             StatusNoSuchDomain = unchecked((int)0xC00000DF),
-            StatusRpcServerUnavailable = unchecked((int)0xC0020017)
+            StatusRpcServerUnavailable = unchecked((int)0xC0020017),
+            StatusRpcCallFailedDidNotExecute = unchecked((int)0xC002001C)
         }
 
         internal struct UNICODE_STRING
@@ -335,6 +367,13 @@ namespace SharpHound3.Tasks
                 Marshal.FreeHGlobal(_objectName);
                 _objectName = IntPtr.Zero;
             }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct SamSidEnumeration
+        {
+            public IntPtr sid;
+            public UNICODE_STRING Name;
         }
         #endregion
     }

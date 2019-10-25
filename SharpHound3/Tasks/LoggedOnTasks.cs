@@ -16,12 +16,12 @@ namespace SharpHound3.Tasks
     {
         private static readonly Regex SidRegex = new Regex(@"S-1-5-21-[0-9]+-[0-9]+-[0-9]+-[0-9]+$", RegexOptions.Compiled);
 
-        internal static LdapWrapper ProcessLoggedOn(LdapWrapper wrapper)
+        internal static async Task<LdapWrapper> ProcessLoggedOn(LdapWrapper wrapper)
         {
             if (wrapper is Computer computer && !computer.PingFailed)
             {
                 var sessions = new List<Session>();
-                sessions.AddRange(GetLoggedOnUsersAPI(computer));
+                sessions.AddRange(await GetLoggedOnUsersAPI(computer));
                 sessions.AddRange(GetLoggedOnUsersRegistry(computer));
                 var temp = computer.Sessions.ToList();
                 temp.AddRange(sessions);
@@ -31,44 +31,45 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
-        private static IEnumerable<Session> GetLoggedOnUsersAPI(Computer computer)
+        private static async Task<List<Session>> GetLoggedOnUsersAPI(Computer computer)
         {
             var resumeHandle = 0;
             var workstationInfoType = typeof(WKSTA_USER_INFO_1);
             var ptrInfo = IntPtr.Zero;
             var entriesRead  = 0;
+            var sessionList = new List<Session>();
 
             try
             {
-                var task = Task<int>.Factory.StartNew(() => NetWkstaUserEnum(computer.APIName, 1, out ptrInfo,
+                var task = Task.Run(() => NetWkstaUserEnum(computer.APIName, 1, out ptrInfo,
                     -1, out entriesRead, out _, ref resumeHandle));
 
                 var success = task.Wait(TimeSpan.FromSeconds(10));
 
                 if (!success)
-                    yield break;
+                    return sessionList;
 
                 var taskResult = task.Result;
                 if (taskResult != 0 && taskResult != 234)
                 {
-                    if (Options.Instance.DumpComputerErrors)
-                        OutputTasks.AddComputerError(new ComputerError
+                    if (Options.Instance.DumpComputerStatus)
+                        OutputTasks.AddComputerStatus(new ComputerStatus
                         {
                             ComputerName = computer.DisplayName,
-                            Error = ((NET_API_STATUS) taskResult).ToString(),
+                            Status = ((NET_API_STATUS) taskResult).ToString(),
                             Task = "NetWkstaUserEnum"
                         });
-                    yield break;
+                    return sessionList;
                 }
                     
 
                 var iterator = ptrInfo;
 
-                if (Options.Instance.DumpComputerErrors)
-                    OutputTasks.AddComputerError(new ComputerError
+                if (Options.Instance.DumpComputerStatus)
+                    OutputTasks.AddComputerStatus(new ComputerStatus
                     {
                         ComputerName = computer.DisplayName,
-                        Error = "Success",
+                        Status = "Success",
                         Task = "NetWkstaUserEnum"
                     });
 
@@ -88,23 +89,26 @@ namespace SharpHound3.Tasks
                     if (username.Trim() == "" || username.EndsWith("$"))
                         continue;
 
-                    if (Helpers.AccountNameToSid(username, domain, false, out var sid))
+                    var (sidSuccess, sid) = await Helpers.AccountNameToSid(username, domain, false);
+                    if ( sidSuccess)
                     {
-                        yield return new Session
+                        sessionList.Add(new Session
                         {
-                            UserName = sid,
-                            ComputerName = computer.ObjectIdentifier
-                        };
+                            UserId = sid,
+                            ComputerId = computer.ObjectIdentifier
+                        });
                     }
                     else
                     {
-                        yield return new Session
+                        sessionList.Add(new Session
                         {
-                            UserName = $"{username}@{Helpers.NormalizeDomainName(domain)}".ToUpper(),
-                            ComputerName = computer.ObjectIdentifier
-                        };
+                            UserId = $"{username}@{Helpers.NormalizeDomainName(domain)}".ToUpper(),
+                            ComputerId = computer.ObjectIdentifier
+                        });
                     }
                 }
+
+                return sessionList;
             }
             finally
             {
@@ -127,11 +131,11 @@ namespace SharpHound3.Tasks
             }
             catch (Exception e)
             {
-                if (Options.Instance.DumpComputerErrors)
-                    OutputTasks.AddComputerError(new ComputerError
+                if (Options.Instance.DumpComputerStatus)
+                    OutputTasks.AddComputerStatus(new ComputerStatus
                     {
                         ComputerName = computer.DisplayName,
-                        Error = e.Message,
+                        Status = e.Message,
                         Task = "RegistryLoggedOn"
                     });
                 yield break;
@@ -141,16 +145,16 @@ namespace SharpHound3.Tasks
             {
                 yield return new Session
                 {
-                    ComputerName = computer.ObjectIdentifier,
-                    UserName = sid
+                    ComputerId = computer.ObjectIdentifier,
+                    UserId = sid
                 };
             }
 
-            if (Options.Instance.DumpComputerErrors)
-                OutputTasks.AddComputerError(new ComputerError
+            if (Options.Instance.DumpComputerStatus)
+                OutputTasks.AddComputerStatus(new ComputerStatus
                 {
                     ComputerName = computer.DisplayName,
-                    Error = "Success",
+                    Status = "Success",
                     Task = "RegistryLoggedOn"
                 });
         }

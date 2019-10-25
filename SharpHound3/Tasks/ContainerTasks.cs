@@ -13,20 +13,20 @@ namespace SharpHound3.Tasks
 {
     internal class ContainerTasks
     {
-        internal static LdapWrapper EnumerateContainer(LdapWrapper wrapper)
+        internal static async Task<LdapWrapper> EnumerateContainer(LdapWrapper wrapper)
         {
             if (wrapper is OU ou)
             {
-                ProcessOUObject(ou);
+                await ProcessOUObject(ou);
             }else if (wrapper is Domain domain)
             {
-                ProcessDomainObject(domain);
+                await ProcessDomainObject(domain);
             }
 
             return wrapper;
         }
 
-        private static void ProcessDomainObject(Domain domain)
+        private static async Task ProcessDomainObject(Domain domain)
         {
             var searchResult = domain.SearchResult;
             var resolvedLinks = new List<GPLink>();
@@ -48,7 +48,8 @@ namespace SharpHound3.Tasks
                     //If the status is 0, its unenforced, 2 is enforced
                     var enforced = status == "2";
 
-                    if (Helpers.DistinguishedNameToGuid(distinguishedName, out var guid))
+                    var (success, guid) = await Helpers.DistinguishedNameToGuid(distinguishedName);
+                    if (success)
                     {
                         resolvedLinks.Add(new GPLink
                         {
@@ -130,7 +131,7 @@ namespace SharpHound3.Tasks
             domain.ChildOus = ous.ToArray();
         }
 
-        private static void ProcessOUObject(OU ou)
+        private static async Task ProcessOUObject(OU ou)
         {
             var searchResult = ou.SearchResult;
             var gpOptions = searchResult.GetProperty("gpoptions");
@@ -155,7 +156,8 @@ namespace SharpHound3.Tasks
                     //If the status is 0, its unenforced, 2 is enforced
                     var enforced = status == "2";
 
-                    if (Helpers.DistinguishedNameToGuid(distinguishedName, out var guid))
+                    var (success, guid) = await Helpers.DistinguishedNameToGuid(distinguishedName);
+                    if (success)
                     {
                         resolvedLinks.Add(new GPLink
                         {

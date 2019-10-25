@@ -15,12 +15,12 @@ namespace SharpHound3.Tasks
             if (wrapper is Computer computer)
             {
                 computer.PingFailed = Helpers.PingHost(computer.APIName, 445) == false;
-                if (computer.PingFailed && Options.Instance.DumpComputerErrors)
+                if (computer.PingFailed && Options.Instance.DumpComputerStatus)
                 {
-                    OutputTasks.AddComputerError(new ComputerError
+                    OutputTasks.AddComputerStatus(new ComputerStatus
                     {
                         ComputerName = computer.DisplayName,
-                        Error = "SMBNotAvailable",
+                        Status = "SMBNotAvailable",
                         Task = "Ping"
                     });
                 }

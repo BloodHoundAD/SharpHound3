@@ -13,11 +13,11 @@ namespace SharpHound3.Tasks
 {
     internal class NetSessionTasks
     {
-        internal static LdapWrapper ProcessNetSessions(LdapWrapper wrapper)
+        internal static async Task<LdapWrapper> ProcessNetSessions(LdapWrapper wrapper)
         {
             if (wrapper is Computer computer && !computer.PingFailed)
             {
-                var sessions = GetNetSessions(computer).ToArray();
+                var sessions = await GetNetSessions(computer);
                 var temp = computer.Sessions.ToList();
                 temp.AddRange(sessions);
                 computer.Sessions = temp.Distinct().ToArray();
@@ -26,13 +26,15 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
-        private static IEnumerable<Session> GetNetSessions(Computer computer)
+        private static async Task<List<Session>> GetNetSessions(Computer computer)
         {
             var resumeHandle = IntPtr.Zero;
             var sessionInfoType = typeof(SESSION_INFO_10);
 
             var entriesRead = 0;
             var ptrInfo = IntPtr.Zero;
+
+            var sessionList = new List<Session>();
 
             try
             {
@@ -42,20 +44,20 @@ namespace SharpHound3.Tasks
                 var success = task.Wait(TimeSpan.FromSeconds(10));
 
                 if (!success)
-                    yield break;
+                    return sessionList;
 
                 var taskResult = task.Result;
 
                 if (taskResult != 0)
                 {
-                    if (Options.Instance.DumpComputerErrors)
-                        OutputTasks.AddComputerError(new ComputerError
+                    if (Options.Instance.DumpComputerStatus)
+                        OutputTasks.AddComputerStatus(new ComputerStatus
                         {
                             ComputerName = computer.DisplayName,
-                            Error = ((NET_API_STATUS) taskResult).ToString(),
+                            Status = ((NET_API_STATUS) taskResult).ToString(),
                             Task = "NetSessionEnum"
                         });
-                    yield break;
+                    return sessionList;
                 }
                     
 
@@ -68,11 +70,11 @@ namespace SharpHound3.Tasks
                     iterator = (IntPtr) (iterator.ToInt64() + Marshal.SizeOf(sessionInfoType));
                 }
 
-                if (Options.Instance.DumpComputerErrors)
-                    OutputTasks.AddComputerError(new ComputerError
+                if (Options.Instance.DumpComputerStatus)
+                    OutputTasks.AddComputerStatus(new ComputerStatus
                     {
                         ComputerName = computer.DisplayName,
-                        Error = "Success",
+                        Status = "Success",
                         Task = "NetSessionEnum"
                     });
 
@@ -103,7 +105,7 @@ namespace SharpHound3.Tasks
                         computerSid = computer.ObjectIdentifier;
 
                     //Try converting the computer name to a SID
-                    computerSid = computerSid ?? Helpers.TryResolveHostToSid(computerName, computer.Domain);
+                    computerSid = computerSid ?? await Helpers.TryResolveHostToSid(computerName, computer.Domain);
 
                     //Try converting the username to a SID
                     var searcher = Helpers.GetDirectorySearcher(computer.Domain);
@@ -112,33 +114,37 @@ namespace SharpHound3.Tasks
                     {
                         foreach (var sid in sids)
                         {
-                            yield return new Session
+                            sessionList.Add(new Session
                             {
-                                ComputerName = computerSid,
-                                UserName = sid
-                            };
+                                ComputerId = computerSid,
+                                UserId = sid
+                            });
                         }
                     }
                     else
                     {
-                        if (Helpers.AccountNameToSid(sessionUsername, computer.Domain, false, out var userSid))
+                        var (sidSuccess, userSid) =
+                            await Helpers.AccountNameToSid(sessionUsername, computer.Domain, false);
+                        if (sidSuccess)
                         {
-                            yield return new Session
+                            sessionList.Add(new Session
                             {
-                                ComputerName = computerSid,
-                                UserName = userSid
-                            };
+                                ComputerId = computerSid,
+                                UserId = userSid
+                            });
                         }
                         else
                         {
-                            yield return new Session
+                            sessionList.Add(new Session
                             {
-                                ComputerName = computerSid,
-                                UserName = sessionUsername
-                            };
+                                ComputerId = computerSid,
+                                UserId = sessionUsername
+                            });
                         }
                     }
                 }
+
+                return sessionList;
             }
             finally
             {

@@ -90,7 +90,7 @@ namespace SharpHound3
 
         internal static DirectorySearch GetDirectorySearcher(string domain)
         {
-            var key = NormalizeDomainName(domain);
+            var key = NormalizeDomainName(domain) ?? NullKey;
             if (DirectorySearchMap.TryGetValue(key, out var searcher))
                 return searcher;
 
@@ -99,7 +99,7 @@ namespace SharpHound3
             return searcher;
         }
 
-        internal static string TryResolveHostToSid(string hostname, string domain)
+        internal static async Task<string> TryResolveHostToSid(string hostname, string domain)
         {
             //Uppercase for consistency
             var newHostname = hostname.ToUpper();
@@ -130,7 +130,8 @@ namespace SharpHound3
                     computerDomain = domain ?? normalizedDomainName;
                 }
 
-                if (AccountNameToSid(computerName, computerDomain,true, out var sid))
+                var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
+                if (success)
                 {
                     HostResolutionMap.TryAdd(newHostname, sid);
                     return sid;
@@ -138,26 +139,28 @@ namespace SharpHound3
             }
 
             //Call NetWkstaGetInfo and see if we can get the info from there.
-            if (Helpers.PingHost(newHostname, 445) && CallNetWkstaGetInfo(newHostname, out var workstationInfo))
+            if (PingHost(newHostname, 445) && CallNetWkstaGetInfo(newHostname, out var workstationInfo))
             {
                 computerDomain = workstationInfo.lan_group;
                 computerName = workstationInfo.computer_name;
 
                 //Try converting Computer Name to SID
-                if (AccountNameToSid(computerName, computerDomain, true, out var sid))
+                var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
+                if (success)
                 {
                     HostResolutionMap.TryAdd(newHostname, sid);
                     return sid;
                 }
             }
 
-            if (RequestNetbiosNameFromComputer(newHostname, out computerName))
+            if (RequestNetbiosNameFromComputer(newHostname, domain, out computerName))
             {
                 //Lets try and use computerDomain if it was set by another method previously, it might be more accurate than what we passed into the function
                 //If computerDomain is still null, then set it to our current domain name
                 computerDomain = computerDomain ?? normalizedDomainName;
 
-                if (AccountNameToSid(computerName, computerDomain, true, out var sid))
+                var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
+                if (success)
                 {
                     HostResolutionMap.TryAdd(newHostname, sid);
                     return sid;
@@ -177,7 +180,8 @@ namespace SharpHound3
                     computerName = splitName[0];
                     computerDomain = string.Join(".", splitName.Skip(1));
 
-                    if (AccountNameToSid(computerName, computerDomain,true, out var sid))
+                    var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
+                    if (success)
                     {
                         HostResolutionMap.TryAdd(newHostname, sid);
                         return sid;
@@ -194,7 +198,8 @@ namespace SharpHound3
                     computerName = splitName[0];
                     computerDomain = string.Join(".", splitName.Skip(1));
 
-                    if (AccountNameToSid(computerName, computerDomain,true, out var sid))
+                    var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
+                    if (success)
                     {
                         HostResolutionMap.TryAdd(newHostname, sid);
                         return sid;
@@ -224,43 +229,69 @@ namespace SharpHound3
             return SPNRegex.IsMatch(target) ? target.Split('/')[1].Split(':')[0] : target;
         }
 
-        private static bool RequestNetbiosNameFromComputer(string server, out string netbios)
+        private static bool RequestNetbiosNameFromComputer(string server, string domain, out string netbios)
         {
             var receiveBuffer = new byte[1024];
             var requestSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            //Set receive timeout to 1 second
-            requestSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 1000);
-            EndPoint remoteEndpoint;
-            if (IPAddress.TryParse(server, out var parsedAddress)) remoteEndpoint = new IPEndPoint(parsedAddress, 137);
-            else
-            {
-                var address = Dns.GetHostAddresses(server)[0];
-                remoteEndpoint = new IPEndPoint(address, 137);
-            }
-
-            var originEndpoint = new IPEndPoint(IPAddress.Any, 0);
-            requestSocket.Bind(originEndpoint);
-            requestSocket.SendTo(NameRequest, remoteEndpoint);
-
             try
             {
-                var receivedByteCount = requestSocket.ReceiveFrom(receiveBuffer, ref remoteEndpoint);
-                if (receivedByteCount >= 90)
+                //Set receive timeout to 1 second
+                requestSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 1000);
+                EndPoint remoteEndpoint;
+
+                //We need to create an endpoint to bind too. If its an IP, just use that.
+                if (IPAddress.TryParse(server, out var parsedAddress)) remoteEndpoint = new IPEndPoint(parsedAddress, 137);
+                else
                 {
-                    netbios = new ASCIIEncoding().GetString(receiveBuffer, 57, 16).Trim();
-                    return true;
+                    //If its not an IP, we're going to try and resolve it from DNS
+                    try
+                    {
+                        IPAddress address;
+                        if (server.Contains("."))
+                        {
+                            address = Dns.GetHostAddresses(server)[0];
+                        }
+                        else
+                        {
+                            var domainName = Options.Instance.RealDNSName ?? domain ?? NormalizeDomainName(null);
+                            address = Dns.GetHostAddresses($"{server}.{domainName}")[0];
+                        }
+
+                        remoteEndpoint = new IPEndPoint(address, 137);
+                    }
+                    catch
+                    {
+                        //Failed to resolve an IP, so return null
+                        netbios = null;
+                        return false;
+                    }
                 }
 
-                netbios = null;
-                return false;
-            }
-            catch (SocketException)
-            {
-                netbios = null;
-                return false;
+                var originEndpoint = new IPEndPoint(IPAddress.Any, 0);
+                requestSocket.Bind(originEndpoint);
+                requestSocket.SendTo(NameRequest, remoteEndpoint);
+
+                try
+                {
+                    var receivedByteCount = requestSocket.ReceiveFrom(receiveBuffer, ref remoteEndpoint);
+                    if (receivedByteCount >= 90)
+                    {
+                        netbios = new ASCIIEncoding().GetString(receiveBuffer, 57, 16).Trim();
+                        return true;
+                    }
+
+                    netbios = null;
+                    return false;
+                }
+                catch (SocketException)
+                {
+                    netbios = null;
+                    return false;
+                }
             }
             finally
             {
+                //Make sure we close the socket if its open
                 requestSocket.Close();
             }
         }
@@ -285,137 +316,105 @@ namespace SharpHound3
             return sid;
         }
 
-        internal static bool AccountNameToSid(string accountName, string accountDomain, bool isComputer, out string sid)
+        internal static async Task<(bool success, string sid)> AccountNameToSid(string accountName, string accountDomain, bool isComputer)
         {
             if (isComputer)
             {
                 accountName = $"{accountName}$";
             }
 
+            string sid;
             if (Cache.Instance.GetPrincipal(accountName, out var principal))
             {
                 sid = principal.ObjectIdentifier;
-                return sid != null;
+                return (sid != null, sid);
             }
 
             var domainName = NormalizeDomainName(accountDomain);
-            bool result;
+            (bool result, string sid) result;
             if (Options.Instance.DomainController != null)
             {
-                result = AccountNameToSidLdap(accountName, domainName, out sid);
+                result = await AccountNameToSidLdap(accountName, domainName);
             }
             else
             {
-                result = AccountNameToSidApi(accountName, domainName, out sid);
+                result = AccountNameToSidApi(accountName, domainName);
             }
 
             Cache.Instance.Add(accountName, new ResolvedPrincipal
             {
-                ObjectIdentifier = sid,
+                ObjectIdentifier = result.sid,
                 ObjectType = isComputer ? LdapTypeEnum.Computer : LdapTypeEnum.User
             });
 
             return result;
         }
 
-        private static bool AccountNameToSidLdap(string computerName, string computerDomain, out string sid)
+        private static async Task<(bool success, string sid)> AccountNameToSidLdap(string accountName, string accountDomain)
         {
-            var searcher = GetDirectorySearcher(computerDomain);
+            var searcher = GetDirectorySearcher(accountDomain);
 
-            var result = searcher.GetOne($"(samaccountname={computerName.ToUpper()}$)", ResolutionProps,
+            var result = await searcher.GetOne($"(samaccountname={accountName.ToUpper()})", ResolutionProps,
                 SearchScope.Subtree);
 
+            string sid;
             if (result == null)
             {
-                sid = null;
-                return false;
+                return (false, null);
             }
 
             sid = result.GetObjectIdentifier();
-            return sid != null;
+            return (sid != null, sid);
         }
 
-        private static bool AccountNameToSidApi(string computerName, string computerDomain, out string sid)
+        private static (bool success, string sid) AccountNameToSidApi(string accountName, string accountDomain)
         {
             try
             {
-                var account = new NTAccount($"{computerDomain}\\{computerName}$");
+                var account = new NTAccount($"{accountDomain}\\{accountName}");
                 var translated = account.Translate(typeof(SecurityIdentifier));
-                sid = translated.Value;
-                return true;
+                var sid = translated.Value;
+                return (true, sid);
             }
             catch
             {
-                sid = null;
-                return false;
+                return (false, null);
             }
         }
 
-        internal static bool AccountNameToSid(string accountName, out string sid)
+        internal static async Task<(bool success, string guid)> DistinguishedNameToGuid(string distinguishedName)
         {
-            if (Cache.Instance.GetPrincipal(accountName, out var principal))
-            {
-                sid = principal.ObjectIdentifier;
-                return sid != null;
-            }
-
+            if (AccountNameToSidCache.TryGetValue(distinguishedName, out string guid))
+                return (guid != null, guid);
 
             if (Options.Instance.DomainController != null)
-            {
+                return await DistinguishedNameToGuidLdap(distinguishedName);
 
-            }
-
-            try
-            {
-                var account = new NTAccount(accountName);
-                var translated = account.Translate(typeof(SecurityIdentifier));
-                sid = translated.Value;
-                return true;
-            }
-            catch
-            {
-                AccountNameToSidCache.TryAdd(accountName, null);
-                sid = null;
-                return false;
-            }
+            return DistinguishedNameToGuidTranslateName(distinguishedName);
         }
 
-
-        internal static bool DistinguishedNameToGuid(string distinguishedName, out string guid)
-        {
-            if (AccountNameToSidCache.TryGetValue(distinguishedName, out guid))
-                return guid != null;
-
-            if (Options.Instance.DomainController != null)
-                return DistinguishedNameToGuidLdap(distinguishedName, out guid);
-
-            return DistinguishedNameToGuidTranslateName(distinguishedName, out guid);
-        }
-
-        private static bool DistinguishedNameToGuidLdap(string dn, out string guid)
+        private static async Task<(bool success, string guid)> DistinguishedNameToGuidLdap(string dn)
         {
             var domain = DistinguishedNameToDomain(dn);
             var searcher = GetDirectorySearcher(domain);
 
-            var result = searcher.GetOne("(objectclass=*)", new[] {"objectguid"}, SearchScope.Base, dn);
+            var result = await searcher.GetOne("(objectclass=*)", new[] {"objectguid"}, SearchScope.Base, dn);
             if (result == null)
             {
-                guid = null;
-                return false;
+                return (false, null);
             }
 
             var guidBytes = result.GetPropertyAsBytes("objectguid");
             if (guidBytes == null)
             {
-                guid = null;
-                return false;
+                return (false, null);
             }
 
-            guid = new Guid(guidBytes).ToString();
-            return true;
+            var guid = new Guid(guidBytes).ToString();
+            return (true, guid);
         }
 
-        private static bool DistinguishedNameToGuidTranslateName(string dn, out string guid)
+        private static (bool success, string guid) DistinguishedNameToGuidTranslateName(string dn)
         {
             var translated = new StringBuilder(1024);
             var nameSize = translated.Capacity;
@@ -424,12 +423,10 @@ namespace SharpHound3
 
             if (status != 0)
             {
-                guid = translated.ToString();
-                return true;
+                return (true, translated.ToString());
             }
 
-            guid = null;
-            return false;
+            return (false, null);
         }
 
         private static string GetDomainNetbiosName(string domain)
@@ -535,7 +532,7 @@ namespace SharpHound3
                 try
                 {
                     var result = client.BeginConnect(hostname, port, null, null);
-                    var success = result.AsyncWaitHandle.WaitOne(500);
+                    var success = result.AsyncWaitHandle.WaitOne(2000);
                     if (!success) return false;
 
                     client.EndConnect(result);
@@ -574,8 +571,9 @@ namespace SharpHound3
                 DomainObjectMap.TryAdd(key, domainObj);
                 return domainObj;
             }
-            catch
+            catch (Exception e)
             {
+                Console.WriteLine(e);
                 DomainObjectMap.TryAdd(key, null);
                 return domainObj;
             }
@@ -608,22 +606,36 @@ namespace SharpHound3
             }
         }
 
-        internal static LdapTypeEnum LookupSidType(string sid)
+        internal static async Task<LdapTypeEnum> LookupSidType(string sid)
         {
-            if (Options.Instance.DomainController != null)
-                return LookupSidTypeLdap(sid);
+            if (CommonPrincipal.GetCommonSid(sid, out var principal))
+                return principal.Type;
 
-            return LookupSidTypeAPI(sid);
+            if (Cache.Instance.GetSidType(sid, out var type))
+                return type;
+
+            if (Options.Instance.DomainController != null)
+            {
+                type = await LookupSidTypeLdap(sid);
+            }
+            else
+            {
+                type = LookupSidTypeAPI(sid);
+            }
+
+            Cache.Instance.Add(sid, type);
+
+            return type;
         }
 
-        internal static LdapTypeEnum LookupSidTypeLdap(string sid)
+        internal static async Task<LdapTypeEnum> LookupSidTypeLdap(string sid)
         {
             var hexSid = ConvertSidToHexSid(sid);
-            var domain = GetDomainNameFromSid(sid);
+            var domain = await GetDomainNameFromSid(sid);
 
             var searcher = GetDirectorySearcher(domain);
 
-            var result = searcher.GetOne($"(objectsid={hexSid})", ResolutionProps, SearchScope.Subtree);
+            var result = await searcher.GetOne($"(objectsid={hexSid})", ResolutionProps, SearchScope.Subtree);
             return result?.GetLdapType() ?? LdapTypeEnum.Unknown;
         }
 
@@ -674,7 +686,7 @@ namespace SharpHound3
             }
         }
 
-        internal static string GetDomainNameFromSid(string sid)
+        internal static async Task<string> GetDomainNameFromSid(string sid)
         {
             SecurityIdentifier identifier;
             try
@@ -699,7 +711,7 @@ namespace SharpHound3
             }
 
             if (Options.Instance.DomainController != null)
-                return GetDomainNameFromSidLdap(sid);
+                return await GetDomainNameFromSidLdap(sid);
 
             return GetDomainNameFromSidAPI(sid);
         }
@@ -709,14 +721,14 @@ namespace SharpHound3
         /// </summary>
         /// <param name="sid"></param>
         /// <returns></returns>
-        private static string GetDomainNameFromSidLdap(string sid)
+        private static async Task<string> GetDomainNameFromSidLdap(string sid)
         {
             var searcher = GetDirectorySearcher(null);
 
             var hexSid = ConvertSidToHexSid(sid);
 
             //Search using objectsid first
-            var result = searcher.GetOne($"(&(objectclass=domain)(objectsid={hexSid}))", new[] {"distinguishedname"}, SearchScope.Subtree, globalCatalog:true);
+            var result = await searcher.GetOne($"(&(objectclass=domain)(objectsid={hexSid}))", new[] {"distinguishedname"}, SearchScope.Subtree, globalCatalog:true);
 
             if (result != null)
             {
@@ -726,7 +738,7 @@ namespace SharpHound3
             }
 
             //Try trusteddomain objects with the securityidentifier attribute
-            result = searcher.GetOne($"(&(objectclass=trusteddomain)(securityidentifier={sid}))",
+            result = await searcher.GetOne($"(&(objectclass=trusteddomain)(securityidentifier={sid}))",
                 new[] {"cn"}, SearchScope.Subtree, globalCatalog: true);
 
             if (result != null)

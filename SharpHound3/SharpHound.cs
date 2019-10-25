@@ -25,6 +25,7 @@ namespace SharpHound3
             {
                 with.CaseInsensitiveEnumValues = true;
                 with.CaseSensitive = false;
+                with.HelpWriter = Console.Error;
             });
 
             parser.ParseArguments<Options>(args).WithParsed(o =>
@@ -39,7 +40,13 @@ namespace SharpHound3
                 }
 
                 Options.Instance = o;
+                Cache.CreateInstance();
+            }).WithNotParsed(error => {
+
             });
+
+            if (Options.Instance == null)
+                return;
 
             if (!Options.Instance.ResolveCollectionMethods())
             {
@@ -52,9 +59,9 @@ namespace SharpHound3
             var ldapVars = LdapBuilder.BuildLdapQuery();
             var producer = new LdapProducer(null, ldapVars.LdapFilter, ldapVars.LdapProperties);
             Task compErrorTask = null;
-            if (Options.Instance.DumpComputerErrors)
+            if (Options.Instance.DumpComputerStatus)
             {
-                compErrorTask = OutputTasks.StartComputerErrorTask();
+                compErrorTask = OutputTasks.StartComputerStatusTask();
             }
 
             var linkOptions = new DataflowLinkOptions
@@ -67,21 +74,23 @@ namespace SharpHound3
             var findTypeBlock = new TransformBlock<SearchResultEntry, LdapWrapper>(ResolveTypeTask.FindLdapType, new ExecutionDataflowBlockOptions
             {
                 MaxDegreeOfParallelism = 10,
-                BoundedCapacity = 250
+                BoundedCapacity = 250,
+                EnsureOrdered = false
             });
 
             findTypeBlock.LinkTo(DataflowBlock.NullTarget<LdapWrapper>(), (item) => item == null);
 
             var resolved = Options.Instance.ResolvedCollectionMethods;
 
-            Console.WriteLine(resolved);
+            Console.WriteLine($"Resolved Collection Methods: {resolved}");
 
             if ((resolved & CollectionMethodResolved.ACL) != 0)
             {
                 var processDaclBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ACLTasks.ProcessDACL, new ExecutionDataflowBlockOptions
                 {
-                    MaxDegreeOfParallelism = 5,
-                    BoundedCapacity = 250
+                    MaxDegreeOfParallelism = 10,
+                    BoundedCapacity = 250,
+                    EnsureOrdered = false
                 });
                 findTypeBlock.LinkTo(processDaclBlock, linkOptions, (item) => item != null);
                 firstLinked = true;
@@ -93,8 +102,9 @@ namespace SharpHound3
             {
                 var processGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(GroupEnumerationTasks.ProcessGroupMembership, new ExecutionDataflowBlockOptions
                 {
-                    MaxDegreeOfParallelism = 5,
-                    BoundedCapacity = 250
+                    MaxDegreeOfParallelism = 20,
+                    BoundedCapacity = 250,
+                    EnsureOrdered = false
                 });
 
                 if (!firstLinked)
@@ -114,8 +124,9 @@ namespace SharpHound3
             {
                 var processPropertiesBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ObjectPropertyTasks.ResolveObjectProperties, new ExecutionDataflowBlockOptions
                 {
-                    MaxDegreeOfParallelism = 5,
-                    BoundedCapacity = 250
+                    MaxDegreeOfParallelism = 10,
+                    BoundedCapacity = 250,
+                    EnsureOrdered = false
                 });
 
                 if (!firstLinked)
@@ -140,8 +151,9 @@ namespace SharpHound3
             {
                 var processContainerBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ContainerTasks.EnumerateContainer, new ExecutionDataflowBlockOptions
                 {
-                    MaxDegreeOfParallelism = 5,
-                    BoundedCapacity = 250
+                    MaxDegreeOfParallelism = 10,
+                    BoundedCapacity = 250,
+                    EnsureOrdered = false
                 });
 
                 if (!firstLinked)
@@ -163,7 +175,8 @@ namespace SharpHound3
                 var pingTask = new TransformBlock<LdapWrapper, LdapWrapper>(ComputerAvailableTasks.CheckComputerAlive, new ExecutionDataflowBlockOptions
                 {
                     MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250
+                    BoundedCapacity = 250,
+                    EnsureOrdered = false
                 });
 
                 if (!firstLinked)
@@ -205,7 +218,8 @@ namespace SharpHound3
                 var processLoggedonBlock = new TransformBlock<LdapWrapper, LdapWrapper>(LoggedOnTasks.ProcessLoggedOn, new ExecutionDataflowBlockOptions
                 {
                     MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250
+                    BoundedCapacity = 250,
+                    EnsureOrdered = false
                 });
 
                 if (!firstLinked)
@@ -227,8 +241,9 @@ namespace SharpHound3
             {
                 var processLocalGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(LocalGroupTasks.GetLocalGroupMembers, new ExecutionDataflowBlockOptions
                 {
-                    MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250
+                    MaxDegreeOfParallelism = 20,
+                    BoundedCapacity = 250,
+                    EnsureOrdered = false
                 });
 
                 if (!firstLinked)
@@ -247,7 +262,8 @@ namespace SharpHound3
             var outputBlock = new ActionBlock<LdapWrapper>(OutputTasks.WriteJsonOutput, new ExecutionDataflowBlockOptions
             {
                 BoundedCapacity = 250,
-                MaxDegreeOfParallelism = 1
+                MaxDegreeOfParallelism = 1,
+                EnsureOrdered = false
             });
 
             lastBlock?.LinkTo(outputBlock, linkOptions);
@@ -258,8 +274,15 @@ namespace SharpHound3
                 producer.StartProducer(findTypeBlock);
             OutputTasks.StartOutputTimer();
             outputBlock.Completion.Wait();
-            OutputTasks.CompleteOutput();
+            CleanupTasks();
             compErrorTask?.Wait();
+            
+        }
+
+        internal static void CleanupTasks()
+        {
+            OutputTasks.PrintStatus();
+            OutputTasks.CompleteOutput();
             Cache.Instance.SaveCache();
         }
     }

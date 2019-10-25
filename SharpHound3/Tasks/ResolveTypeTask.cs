@@ -117,14 +117,15 @@ namespace SharpHound3.Tasks
                     throw new ArgumentOutOfRangeException();
             }
 
-            //Set the DN/SID for the wrapper going forward
             if (wrapper == null)
             {
                 Console.WriteLine($"Null Wrapper: {distinguishedName}");
                 return wrapper;
             }
-            wrapper.DistinguishedName = distinguishedName;
 
+            //Set the DN/SID for the wrapper going forward
+            wrapper.DistinguishedName = distinguishedName;
+            wrapper.Properties.Add("name", wrapper.DisplayName);
             wrapper.ObjectIdentifier = objectIdentifier;
 
             //Return our wrapper for the next step in the pipeline

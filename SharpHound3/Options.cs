@@ -95,11 +95,14 @@ namespace SharpHound3
         [Option(HelpText = "Disable remote registry check in LoggedOn collection", Default = false)]
         public bool NoRegistryLoggedOn { get; set; }
 
-        [Option(HelpText = "Dump errors related to computer enumeration to a CSV file", Default = false)]
-        public bool DumpComputerErrors { get; set; }
+        [Option(HelpText = "Dump success/failures related to computer enumeration to a CSV file", Default = false)]
+        public bool DumpComputerStatus { get; set; }
 
         [Option(HelpText = "Override DNS name for API calls", Default = null)]
         public string RealDNSName { get; set; }
+
+        [Option(HelpText = "Collect all LDAP properties from objects instead of a subset during ObjectProps", Default = false)]
+        public bool CollectAllProperties { get; set; }
 
         //Output Options
         [Option(HelpText = "Interval in which to display status in milliseconds", Default = 30000)]

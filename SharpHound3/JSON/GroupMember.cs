@@ -9,12 +9,12 @@ namespace SharpHound3.JSON
 {
     internal class GroupMember
     {
-        public string MemberName { get; set; }
+        public string MemberId { get; set; }
         public LdapTypeEnum MemberType { get;set; }
 
         public override string ToString()
         {
-            return $"{MemberName} - {MemberType}";
+            return $"{MemberId} - {MemberType}";
         }
     }
 }

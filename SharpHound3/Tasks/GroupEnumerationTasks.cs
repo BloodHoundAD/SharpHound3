@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.DirectoryServices;
 using System.DirectoryServices.Protocols;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using SharpHound3.Enums;
@@ -20,12 +22,24 @@ namespace SharpHound3.Tasks
         private static readonly Cache AppCache = Cache.Instance;
         //These are the properties required to do the appropriate lookups for group membership translations
         internal static readonly string[] LookupProps = { "samaccounttype", "objectsid", "objectclass" };
-        internal static LdapWrapper ProcessGroupMembership(LdapWrapper wrapper)
+        private static int _fspCount = 0;
+
+        internal static async Task<LdapWrapper> ProcessGroupMembership(LdapWrapper wrapper)
         {
             if (wrapper is Group group)
             {
-                GetGroupMembership(group);
-            }else if (wrapper is Computer || wrapper is User)
+                var watch = new Stopwatch();
+                watch.Start();
+                await GetGroupMembership(group);
+                if (watch.ElapsedMilliseconds > 10000)
+                {
+                    Console.WriteLine(
+                        $"{wrapper.DisplayName} took {watch.Elapsed} with {group.Members.Length} members");
+                }
+
+                watch.Stop();
+            }
+            else if (wrapper is Computer || wrapper is User)
             {
                 GetPrimaryGroupInfo(wrapper);
             }
@@ -51,7 +65,7 @@ namespace SharpHound3.Tasks
             }
         }
 
-        private static void GetGroupMembership(Group group)
+        private static async Task GetGroupMembership(Group group)
         {
             var finalMembers = new List<GroupMember>();
             var searchResult = group.SearchResult;
@@ -69,7 +83,7 @@ namespace SharpHound3.Tasks
             {
                 //Lets try ranged retrieval here
                 var searcher = Helpers.GetDirectorySearcher(group.Domain);
-                var range = searcher.RetrieveRangedAttribute(group.DistinguishedName, "member");
+                var range = await searcher.RangedRetrievalAsync(group.DistinguishedName, "member");
                 //If we get null back, then something went wrong.
                 if (range == null)
                 {
@@ -79,14 +93,14 @@ namespace SharpHound3.Tasks
 
                 foreach (var groupMemberDistinguishedName in range)
                 {
-                    finalMembers.Add(TranslateDistinguishedName(groupMemberDistinguishedName));
+                    finalMembers.Add(await TranslateDistinguishedName(groupMemberDistinguishedName));
                 }
             }
             else
             {
                 foreach (var groupMemberDistinguishedName in groupMembers)
                 {
-                    finalMembers.Add(TranslateDistinguishedName(groupMemberDistinguishedName));
+                    finalMembers.Add(await TranslateDistinguishedName(groupMemberDistinguishedName));
                 }
             }
 
@@ -99,7 +113,7 @@ namespace SharpHound3.Tasks
         /// </summary>
         /// <param name="distinguishedName"></param>
         /// <returns></returns>
-        private static GroupMember TranslateDistinguishedName(string distinguishedName)
+        private static async Task<GroupMember> TranslateDistinguishedName(string distinguishedName)
         {
             //Check cache to see if we have the item in there first.
             if (AppCache.GetPrincipal(distinguishedName, out var resolved))
@@ -107,26 +121,16 @@ namespace SharpHound3.Tasks
                 return new GroupMember
                 {
                     MemberType = resolved.ObjectType,
-                    MemberName = resolved.ObjectIdentifier
+                    MemberId = resolved.ObjectIdentifier
                 };
             }
 
-            GroupMember member;
-
-            //If a Domain Controller is specified, we want to bind specifically to that DC so we'll use that instead.
-            if (Options.Instance.DomainController != null)
-            {
-                member = TranslateDistinguishedNameWithLdap(distinguishedName);
-            }
-            else
-            {
-                member = TranslateDistinguishedNameWithAPI(distinguishedName);
-            }
+            var member = await TranslateDistinguishedNameWithLdap(distinguishedName);
 
             //Add our new member to the cache for future lookups
             AppCache.Add(distinguishedName, new ResolvedPrincipal
             {
-                ObjectIdentifier = member.MemberName,
+                ObjectIdentifier = member.MemberId,
                 ObjectType = member.MemberType
             });
 
@@ -134,76 +138,11 @@ namespace SharpHound3.Tasks
         }
 
         /// <summary>
-        /// Translates a group member to the appropriate variables using DirectoryEntry + LookupSids. More automatic/reliable
+        /// Attempts to resolve a distinguishedname to the proper format using only LDAP, allowing us to control what server it binds too.
         /// </summary>
         /// <param name="distinguishedName"></param>
         /// <returns></returns>
-        private static GroupMember TranslateDistinguishedNameWithAPI(string distinguishedName)
-        {
-            var domain = Helpers.DistinguishedNameToDomain(distinguishedName);
-            LdapTypeEnum type;
-            string sid;
-
-            if (distinguishedName.Contains("ForeignSecurityPrincipals"))
-            {
-                // If the DN is a FSP, we want to extract the sid first
-                sid = distinguishedName.Split(',')[0].Substring(3);
-
-                //Check if the SID is a common principal
-                if (CommonPrincipal.GetCommonSid(sid, out var commonPrincipal))
-                {
-                    return new GroupMember
-                    {
-                        MemberName = Helpers.ConvertCommonSid(sid, domain),
-                        MemberType = commonPrincipal.Type
-                    };
-                }
-
-                //Use the LookupAccountSid API call to get the type of the SID
-                type = Helpers.LookupSidType(sid);
-
-                return new GroupMember
-                {
-                    MemberType = type,
-                    MemberName = sid
-                };
-            }
-
-            //The DN is not a FSP, so we need to go from DistinguishedName -> SID
-            //Bind to a DirectoryEntry using the DN as the path.
-            using (var directoryEntry = new DirectoryEntry($"LDAP://{distinguishedName}"))
-            {
-                // Call RefreshCache with our array to ensure that it ONLY loads these properties.
-                directoryEntry.RefreshCache(LookupProps);
-                sid = directoryEntry.GetSid();
-
-                if (sid == null)
-                {
-                    return new GroupMember
-                    {
-                        MemberType = LdapTypeEnum.Unknown,
-                        MemberName = distinguishedName
-                    };
-                }
-
-                type = directoryEntry.GetLdapType();
-
-                return new GroupMember
-                {
-                    MemberType = type,
-                    MemberName = sid
-                };
-            }
-        }
-
-        
-
-        /// <summary>
-        /// Attempts to resolve a distguishedname to the proper format using only LDAP, allowing us to control what server it binds too.
-        /// </summary>
-        /// <param name="distinguishedName"></param>
-        /// <returns></returns>
-        private static GroupMember TranslateDistinguishedNameWithLdap(string distinguishedName)
+        private static async Task<GroupMember> TranslateDistinguishedNameWithLdap(string distinguishedName)
         {
             var domain = Helpers.DistinguishedNameToDomain(distinguishedName);
             var searcher = Helpers.GetDirectorySearcher(domain);
@@ -212,42 +151,51 @@ namespace SharpHound3.Tasks
 
             if (distinguishedName.Contains("ForeignSecurityPrincipals"))
             {
-                //If this is an FSP, we extract the SID for the "distinguishedname"
+                Interlocked.Increment(ref _fspCount);
+                Console.WriteLine($"FSP:{_fspCount}");
+
+                //If this is an FSP, we extract the SID from the "distinguishedname"
                 var sid = distinguishedName.Split(',')[0].Substring(3);
-                
+                if (distinguishedName.Contains("CN=S-1-5-21"))
+                {
+                    searchResult = await searcher.GetOne($"(objectsid={Helpers.ConvertSidToHexSid(sid)})", LookupProps,
+                        SearchScope.Subtree);
+
+                    if (searchResult == null)
+                    {
+                        return new GroupMember
+                        {
+                            MemberType = LdapTypeEnum.Unknown,
+                            MemberId = distinguishedName
+                        };
+                    }
+
+                    type = searchResult.GetLdapType();
+                    return new GroupMember
+                    {
+                        MemberType = type,
+                        MemberId = sid
+                    };
+                }
+
                 //Check if its a common principal
                 if (CommonPrincipal.GetCommonSid(sid, out var commonPrincipal))
                 {
                     return new GroupMember
                     {
-                        MemberName = Helpers.ConvertCommonSid(sid, domain),
+                        MemberId = Helpers.ConvertCommonSid(sid, domain),
                         MemberType = commonPrincipal.Type
                     };
                 }
 
-                // We have a SID, so convert the sid to its hex representation and then search AD for it
-                searchResult = searcher.GetOne($"(objectsid={Helpers.ConvertSidToHexSid(sid)})", LookupProps,
-                    SearchScope.Subtree);
-
-                if (searchResult == null)
-                {
-                    return new GroupMember
-                    {
-                        MemberType = LdapTypeEnum.Unknown,
-                        MemberName = distinguishedName
-                    };
-                }
-
-                type = searchResult.GetLdapType();
-                return new GroupMember
-                {
-                    MemberType = type,
-                    MemberName = sid
+                return new GroupMember{
+                    MemberType = LdapTypeEnum.Unknown,
+                    MemberId = sid
                 };
             }
 
             //This is not an FSP, so lets bind to the DC and set the search base to the distinguished name
-            searchResult = searcher.GetOne("(objectclass=*)", LookupProps,
+            searchResult = await searcher.GetOne("(objectclass=*)", LookupProps,
                 SearchScope.Base,
                 distinguishedName);
 
@@ -255,7 +203,7 @@ namespace SharpHound3.Tasks
             {
                 return new GroupMember
                 {
-                    MemberName = distinguishedName,
+                    MemberId = distinguishedName,
                     MemberType= LdapTypeEnum.Unknown
                 };
             }
@@ -263,11 +211,10 @@ namespace SharpHound3.Tasks
             type = searchResult.GetLdapType();
             return new GroupMember
             {
-                MemberName = searchResult.GetSid(),
+                MemberId = searchResult.GetSid(),
                 MemberType = type
             };
         }
 
-        
     }
 }

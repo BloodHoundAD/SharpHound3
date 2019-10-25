@@ -13,10 +13,14 @@ namespace SharpHound3.LdapWrappers
     {
         internal Computer(SearchResultEntry entry) : base(entry)
         {
-            AllowedToAct = new string[0];
+            AllowedToAct = new GroupMember[0];
             AllowedToDelegate = new string[0];
             Sessions = new Session[0];
             PingFailed = false;
+            LocalAdmins = new GroupMember[0];
+            RemoteDesktopUsers = new GroupMember[0];
+            DcomUsers = new GroupMember[0];
+            PSRemoteUsers= new GroupMember[0];
         }
 
         [JsonIgnore]
@@ -24,7 +28,7 @@ namespace SharpHound3.LdapWrappers
 
         public string[] AllowedToDelegate { get; set; }
 
-        public string[] AllowedToAct { get; set; }
+        public GroupMember[] AllowedToAct { get; set; }
 
         public string PrimaryGroupSid { get; set; }
 

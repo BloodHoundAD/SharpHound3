@@ -14,51 +14,73 @@ namespace SharpHound3
 {
     internal class Cache
     {
-        private ConcurrentDictionary<string, object> _dictionary;
+        [JsonProperty]
+        private ConcurrentDictionary<string, ResolvedPrincipal> _resolvedPrincipalDictionary;
 
-        [JsonIgnore]
-        private static readonly Lazy<Cache> CacheInstance = new Lazy<Cache>(() => new Cache());
+        [JsonProperty]
+        private ConcurrentDictionary<string, string[]> _globalCatalogDictionary;
+
+        [JsonProperty]
+        private ConcurrentDictionary<string, LdapTypeEnum> _sidTypeDictionary;
+
         [JsonIgnore]
         private readonly Mutex _bhMutex;
 
         [JsonIgnore]
-        public static Cache Instance => CacheInstance.Value;
+        public static Cache Instance => CacheInstance;
+
+        [JsonIgnore]
+        private static Cache CacheInstance { get; set; }
+
+        internal static void CreateInstance()
+        {
+            CacheInstance = new Cache();
+            CacheInstance.LoadCache();
+        }
 
         private Cache()
         {
-            LoadCache();
             _bhMutex = new Mutex(false, $"MUTEX:{GetBase64MachineID()}");
         }
 
         internal bool GetPrincipal(string key, out ResolvedPrincipal value)
         {
-            var success = _dictionary.TryGetValue($"RP:{key}", out var principal);
-            value = principal as ResolvedPrincipal;
-            return success;
+            return _resolvedPrincipalDictionary.TryGetValue(key.ToUpper(), out value);
         }
 
         internal bool GetGlobalCatalogMatches(string key, out string[] sids)
         {
-            var success = _dictionary.TryGetValue($"GC:{key}", out var possible);
-            sids = possible as string[];
-            return success;
+            return _globalCatalogDictionary.TryGetValue(key.ToUpper(), out sids);
+        }
+
+        internal bool GetSidType(string key, out LdapTypeEnum type)
+        {
+            return _sidTypeDictionary.TryGetValue(key.ToUpper(), out type);
         }
 
         internal void Add(string key, ResolvedPrincipal value)
         {
-            _dictionary.TryAdd($"RP:{key}", value);
+            _resolvedPrincipalDictionary.TryAdd(key.ToUpper(), value);
         }
 
         internal void Add(string key, string[] domains)
         {
-            _dictionary.TryAdd($"GC:{key}", domains);
+            _globalCatalogDictionary.TryAdd(key.ToUpper(), domains);
+        }
+
+        internal void Add(string key, LdapTypeEnum type)
+        {
+            _sidTypeDictionary.TryAdd(key, type);
         }
 
         internal void LoadCache()
         {
             if (Options.Instance.InvalidateCache)
             {
-                _dictionary = new ConcurrentDictionary<string, object>();
+                _globalCatalogDictionary = new ConcurrentDictionary<string, string[]>();
+                _resolvedPrincipalDictionary = new ConcurrentDictionary<string, ResolvedPrincipal>();
+                _sidTypeDictionary = new ConcurrentDictionary<string, LdapTypeEnum>();
+                Console.WriteLine("Cache Invalidated: 0 Objects in Cache");
                 return;
             }
 
@@ -66,7 +88,10 @@ namespace SharpHound3
 
             if (!File.Exists(fileName))
             {
-                _dictionary = new ConcurrentDictionary<string, object>();
+                _globalCatalogDictionary = new ConcurrentDictionary<string, string[]>();
+                _resolvedPrincipalDictionary = new ConcurrentDictionary<string, ResolvedPrincipal>();
+                _sidTypeDictionary = new ConcurrentDictionary<string, LdapTypeEnum>();
+                Console.WriteLine("Cache File not Found: 0 Objects in cache");
                 return;
             }
 
@@ -75,13 +100,14 @@ namespace SharpHound3
                 _bhMutex.WaitOne();
                 var bytes = File.ReadAllBytes(fileName);
                 var json = new UTF8Encoding(true).GetString(bytes);
-
-                _dictionary = JsonConvert.DeserializeObject<ConcurrentDictionary<string, object>>(json);
+                CacheInstance = JsonConvert.DeserializeObject<Cache>(json);
+                Console.WriteLine($"Cache File Found! Loaded {CacheInstance._resolvedPrincipalDictionary.Count + CacheInstance._globalCatalogDictionary.Count + CacheInstance._sidTypeDictionary.Count} Objects in cache");
             }
             finally
             {
                 _bhMutex.ReleaseMutex();
             }
+
         }
 
         private string GetCacheFileName()
@@ -99,7 +125,7 @@ namespace SharpHound3
                 return;
             }
 
-            var jsonCache = new UTF8Encoding(true).GetBytes(JsonConvert.SerializeObject(_dictionary));
+            var jsonCache = new UTF8Encoding(true).GetBytes(JsonConvert.SerializeObject(CacheInstance));
             var finalFilename = GetCacheFileName();
 
             try

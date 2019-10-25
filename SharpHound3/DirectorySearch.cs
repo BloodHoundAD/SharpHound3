@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.DirectoryServices.ActiveDirectory;
@@ -6,7 +7,10 @@ using System.DirectoryServices.Protocols;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Timers;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using SharpHound3.Enums;
 using SearchOption = System.DirectoryServices.Protocols.SearchOption;
 
@@ -19,6 +23,7 @@ namespace SharpHound3
         private readonly Domain _domain;
         private Dictionary<string, string> _domainGuidMap;
         private readonly ConcurrentBag<LdapConnection> _connectionPool = new ConcurrentBag<LdapConnection>();
+        private static int _connectionCount = 0;
 
         public DirectorySearch(string domainName = null, string domainController = null)
         {
@@ -81,29 +86,33 @@ namespace SharpHound3
             }
         }
 
-        internal SearchResultEntry GetOne(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false)
+        internal async Task<SearchResultEntry> GetOne(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false)
         {
             var connection = globalCatalog ? GetGlobalCatalogConnection() : GetLdapConnection();
             try
             {
-                var searchRequest = CreateSearchRequest(ldapFilter, scope, props);
+                var searchRequest = CreateSearchRequest(ldapFilter, scope, props, adsPath);
 
-                SearchResponse searchResponse;
+                var iAsyncResult = connection.BeginSendRequest(searchRequest,
+                    PartialResultProcessing.NoPartialResultSupport, null, null);
+
+                var task = Task<SearchResponse>.Factory.FromAsync(iAsyncResult,
+                    x => (SearchResponse) connection.EndSendRequest(x));
+
                 try
                 {
-                    searchResponse = (SearchResponse)connection.SendRequest(searchRequest);
+                    var response = await task;
+                    if (response.Entries.Count == 0)
+                    {
+                        return null;
+                    }
+
+                    return response.Entries[0];
                 }
-                catch (Exception e)
+                catch
                 {
-                    Console.WriteLine("\nUnexpected exception occured:\n\t{0}: {1}",
-                        e.GetType().Name, e.Message);
                     return null;
                 }
-
-                if (searchResponse.Entries.Count == 0)
-                    return null;
-
-                return searchResponse.Entries[0];
             }
             finally
             {
@@ -171,90 +180,31 @@ namespace SharpHound3
             }
         }
 
-        internal IEnumerable<string> RetrieveRangedAttribute(string distinguishedName, string attribute)
-        {
-            try
-            {
-                //Try ASQ first
-                return RangeRetrievalAsq(distinguishedName, attribute);
-            }
-            catch
-            {
-                try
-                {
-                    return RangeRetrievalFallback(distinguishedName, attribute);
-                }
-                catch
-                {
-                    return null;
-                }
-            }
-        }
-
-
-        /// <summary>
-        /// Attempt to retrieve an LDAP attribute from a DN using an Attribute Scoped Query
-        /// </summary>
-        /// <param name="distinguishedName"></param>
-        /// <param name="attribute"></param>
-        /// <returns></returns>
-        private IEnumerable<string> RangeRetrievalAsq(string distinguishedName, string attribute)
+        internal async Task<List<string>> RangedRetrievalAsync(string distinguishedName, string attribute)
         {
             var connection = GetLdapConnection();
-            try
-            {
-                var searchRequest = CreateSearchRequest("(objectclass=*)", SearchScope.Base, null, distinguishedName);
-                var asq = new AsqRequestControl(attribute);
-                searchRequest.Controls.Add(asq);
-
-                var searchResponse = (SearchResponse) connection.SendRequest(searchRequest);
-
-                if (searchResponse.Controls.Length != 1 || !(searchResponse.Controls[0] is AsqResponseControl))
-                {
-                    //The domain controller doesn't support ASQ for some reason. So fall back to old fashioned LDAP retrieval.
-                    throw new ControlNotSupportedException();
-                }
-
-                foreach (SearchResultEntry entry in searchResponse.Entries)
-                {
-                    yield return entry.DistinguishedName;
-                }
-            }
-            finally
-            {
-                _connectionPool.Add(connection);
-            }
-        }
-
-        /// <summary>
-        /// Attempt to retrieve a ranged LDAP attribute using old school ranged retrieval
-        /// </summary>
-        /// <param name="distinguishedName"></param>
-        /// <param name="attribute"></param>
-        /// <returns></returns>
-        private IEnumerable<string> RangeRetrievalFallback(string distinguishedName, string attribute)
-        {
-            var connection = GetLdapConnection();
+            var members = new List<string>();
             try
             {
                 var index = 0;
                 var step = 0;
-                var baseString = $"{attribute};";
+                var baseString = $"{attribute}";
                 var currentRange = $"{baseString};range={index}-*";
-
-                var searchRequest = CreateSearchRequest($"{attribute}=*", SearchScope.Base, new string[] {currentRange},
-                    distinguishedName);
-
                 var searchDone = false;
+
+                var searchRequest = CreateSearchRequest($"{attribute}=*", SearchScope.Base, new[] { currentRange },
+                    distinguishedName);
 
                 while (true)
                 {
-                    var response = (SearchResponse) connection.SendRequest(searchRequest);
-
+                    var iASyncResult = connection.BeginSendRequest(searchRequest,
+                        PartialResultProcessing.NoPartialResultSupport, null,null);
+                    var task = Task<SearchResponse>.Factory.FromAsync(iASyncResult, x => (SearchResponse)connection.EndSendRequest(x));
+                    var response = await task;
+                    //There should only be one searchresultentry
                     if (response?.Entries.Count == 1)
                     {
                         var entry = response.Entries[0];
-
                         foreach (string attr in entry.Attributes.AttributeNames)
                         {
                             currentRange = attr;
@@ -264,15 +214,14 @@ namespace SharpHound3
 
                         foreach (string member in entry.Attributes[currentRange].GetValues(typeof(string)))
                         {
-                            yield return member;
+                            members.Add(member);
                             index++;
                         }
 
                         if (searchDone)
                         {
-                            yield break;
+                            return members;
                         }
-
 
                         currentRange = $"{baseString};range={index}-{index + step}";
 
@@ -281,7 +230,7 @@ namespace SharpHound3
                     }
                     else
                     {
-                        yield break;
+                        return members;
                     }
                 }
             }
@@ -320,9 +269,8 @@ namespace SharpHound3
         private LdapConnection GetGlobalCatalogConnection()
         {
             var domainController = _domainController ?? _domainName;
-            var port = 3628;
 
-            var identifier = new LdapDirectoryIdentifier(domainController, port, false, false);
+            var identifier = new LdapDirectoryIdentifier(domainController, 3628, false, false);
             var connection = new LdapConnection(identifier);
 
             var ldapSessionOptions = connection.SessionOptions;
@@ -345,6 +293,9 @@ namespace SharpHound3
             {
                 return connection;
             }
+
+            Interlocked.Increment(ref _connectionCount);
+            Console.WriteLine($"Connection Count: {_connectionCount}");
 
             var domainController = _domainController ?? _domainName;
             var port = Options.Instance.LdapPort == 0

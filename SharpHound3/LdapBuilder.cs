@@ -16,13 +16,14 @@ namespace SharpHound3
 
             //We always want these properties to ensure we can at least pass type finding: "samaccounttype", "objectsid", "objectguid", "objectclass"
             ldapProperties.AddRange(Helpers.ResolutionProps);
+            ldapProperties.Add("samaccountname");
 
             var methods = Options.Instance.ResolvedCollectionMethods;
 
             //Group membership collection
             if (methods.HasFlag(CollectionMethodResolved.Group))
             {
-                ldapFilterParts.Add("(|(member=*)(primarygroupid=*))");
+                ldapFilterParts.Add("(|(samaccounttype=268435456)(samaccounttype=268435457)(samaccounttype=536870912)(samaccounttype=536870913)(primarygroupid=*))");
                 ldapProperties.AddRange(new [] {"member", "primarygroupid"});
             }
 
@@ -54,8 +55,8 @@ namespace SharpHound3
                 ldapFilterParts.Add("(|(samaccounttype=268435456)(samaccounttype=268435457)(samaccounttype=536870912)(samaccounttype=536870913)(samaccounttype=805306368)(samaccounttype=805306369)(objectclass=domain)(objectclass=organizationalUnit)(objectcategory=groupPolicyContainer))");
                 ldapProperties.AddRange(new[]
                 {
-                    "samaccountname", "distinguishedname", "samaccounttype", "pwdlastset", "lastlogon", "lastlogontimestamp", "objectsid",
-                    "sidhistory", "useraccountcontrol", "dnshostname", "operatingsystem",
+                    "pwdlastset", "lastlogon", "lastlogontimestamp", "objectsid",
+                    "sidhistory", "useraccountcontrol", "operatingsystem",
                     "operatingsystemservicepack", "serviceprincipalname", "displayname", "mail", "title",
                     "homedirectory","description","admincount","userpassword","gpcfilesyspath","objectclass",
                     "msds-behavior-version","objectguid", "name", "gpoptions", "msds-allowedToDelegateTo", "msDS-AllowedToActOnBehalfOfOtherIdentity"
