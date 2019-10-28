@@ -96,7 +96,7 @@ namespace SharpHound3.Tasks
             {
                 var delegates = result.GetPropertyAsArray("msds-AllowedToDelegateTo");
                 wrapper.Properties.Add("allowedtodelegate", delegates);
-
+                // For each computer thats in this array, try and turn it into a SID
                 foreach (var computerName in delegates)
                 {
                     var resolvedHost = await Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
@@ -127,7 +127,6 @@ namespace SharpHound3.Tasks
                     {
                         type = await Helpers.LookupSidType(sid);
                     }
-
 
                     allowedToActPrincipals.Add(new GenericMember
                     {
@@ -230,6 +229,7 @@ namespace SharpHound3.Tasks
                 var delegates = result.GetPropertyAsArray("msds-AllowedToDelegateTo");
                 wrapper.Properties.Add("allowedtodelegate", delegates);
 
+                //Try to resolve each computer to a SID
                 foreach (var computerName in delegates)
                 {
                     var resolvedHost = await Helpers.TryResolveHostToSid(computerName, wrapper.Domain);

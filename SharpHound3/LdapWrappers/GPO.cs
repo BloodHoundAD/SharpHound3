@@ -15,6 +15,7 @@ namespace SharpHound3.LdapWrappers
             RemoteDesktopUsers = new GenericMember[0];
             LocalAdmins = new GenericMember[0];
             DcomUsers = new GenericMember[0];
+            PSRemoteUsers = new GenericMember[0];
             AffectedComputers = new string[0];
         }
 
@@ -22,5 +23,6 @@ namespace SharpHound3.LdapWrappers
         public GenericMember[] RemoteDesktopUsers { get; set; }
         public GenericMember[] LocalAdmins { get; set; }
         public GenericMember[] DcomUsers { get; set; }
+        public GenericMember[] PSRemoteUsers { get; set; }
     }
 }

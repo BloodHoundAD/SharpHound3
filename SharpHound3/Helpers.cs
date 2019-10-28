@@ -628,7 +628,7 @@ namespace SharpHound3
             return type;
         }
 
-        internal static async Task<LdapTypeEnum> LookupSidTypeLdap(string sid)
+        private static async Task<LdapTypeEnum> LookupSidTypeLdap(string sid)
         {
             var hexSid = ConvertSidToHexSid(sid);
             var domain = await GetDomainNameFromSid(sid);
@@ -644,7 +644,7 @@ namespace SharpHound3
         /// </summary>
         /// <param name="sid"></param>
         /// <returns></returns>
-        internal static LdapTypeEnum LookupSidTypeAPI(string sid)
+        private static LdapTypeEnum LookupSidTypeAPI(string sid)
         {
             var name = new StringBuilder();
             var nameLength = (uint)name.Capacity;

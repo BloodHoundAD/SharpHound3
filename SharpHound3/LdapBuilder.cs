@@ -17,6 +17,8 @@ namespace SharpHound3
             //We always want these properties to ensure we can at least pass type finding: "samaccounttype", "objectsid", "objectguid", "objectclass"
             ldapProperties.AddRange(Helpers.ResolutionProps);
             ldapProperties.Add("samaccountname");
+            //LAPS is weird and several collection methods depend on it, but its easier to just have the property in all our collections
+            ldapProperties.Add("ms-mcs-admpwdexpirationtime");
 
             var methods = Options.Instance.ResolvedCollectionMethods;
 
@@ -71,7 +73,8 @@ namespace SharpHound3
 
             if (methods.HasFlag(CollectionMethodResolved.GPOLocalGroup))
             {
-
+                ldapFilterParts.Add("(&(objectCategory=groupPolicyContainer)(name=*)(gpcfilesyspath=*))");
+                ldapProperties.AddRange(new[] {"gpcfilesyspath", "displayname"});
             }
 
             if (methods.HasFlag(CollectionMethodResolved.SPNTargets))

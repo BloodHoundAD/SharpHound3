@@ -140,7 +140,7 @@ namespace SharpHound3
             var connection = globalCatalog ? GetGlobalCatalogConnection() :  GetLdapConnection();
             try
             {
-                var searchRequest = CreateSearchRequest(ldapFilter, scope, props);
+                var searchRequest = CreateSearchRequest(ldapFilter, scope, props, adsPath);
                 var pageRequest = new PageResultRequestControl(500);
                 searchRequest.Controls.Add(pageRequest);
 
@@ -162,6 +162,7 @@ namespace SharpHound3
                     }
                     catch (Exception e)
                     {
+                        Console.WriteLine(ldapFilter);
                         Console.WriteLine("\nUnexpected exception occured:\n\t{0}: {1}",
                             e.GetType().Name, e.Message);
                         yield break;

@@ -104,7 +104,7 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            group.Members = finalMembers.ToArray();
+            group.Members = finalMembers.Distinct().ToArray();
         }
 
         /// <summary>

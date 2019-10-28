@@ -70,7 +70,8 @@
     <Compile Include="Cache.cs" />
     <Compile Include="Enums\CollectionMethods.cs" />
     <Compile Include="CommonPrincipal.cs" />
-    <Compile Include="Enums\NET_API_STATUS.cs" />
+    <Compile Include="Enums\LocalGroupRids.cs" />
+    <Compile Include="Enums\NetApiStatus.cs" />
     <Compile Include="Enums\UACFlags.cs" />
     <Compile Include="Exceptions.cs" />
     <Compile Include="Extensions.cs" />
@@ -95,6 +96,7 @@
     <Compile Include="DirectorySearch.cs" />
     <Compile Include="Tasks\ComputerAvailableTasks.cs" />
     <Compile Include="Tasks\ContainerTasks.cs" />
+    <Compile Include="Tasks\GPOGroupTasks.cs" />
     <Compile Include="Tasks\GroupEnumerationTasks.cs" />
     <Compile Include="Options.cs" />
     <Compile Include="Tasks\LocalGroupTasks.cs" />

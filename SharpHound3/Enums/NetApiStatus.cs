@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SharpHound3.Enums
 {
-    internal enum NET_API_STATUS
+    internal enum NetApiStatus
     {
         NERR_Success = 0,
         ERROR_MORE_DATA = 234,

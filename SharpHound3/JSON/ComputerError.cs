@@ -13,6 +13,10 @@ namespace SharpHound3.JSON
         internal string Task { get; set; }
         internal string Status { get; set; }
 
+        /// <summary>
+        /// Converts to CSV format for output
+        /// </summary>
+        /// <returns></returns>
         internal string ToCsv()
         {
             return $"{StringToCsvCell(ComputerName)}, {StringToCsvCell(Task)}, {StringToCsvCell(Status)}";

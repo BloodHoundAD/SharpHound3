@@ -77,18 +77,34 @@ namespace SharpHound3.Tasks
                         DisplayName = $"{accountName}.{accountDomain}".ToUpper(),
                         SamAccountName = accountName
                     };
+
+                    var hasLaps = searchResultEntry.GetProperty("ms-mcs-admpwdexpirationtime") != null;
+                    wrapper.Properties.Add("haslaps", hasLaps);
+                    wrapper.Properties.Add("highvalue", false);
                     break;
                 case LdapTypeEnum.User:
                     wrapper = new User(searchResultEntry)
                     {
                         DisplayName = $"{accountName}@{accountDomain}".ToUpper()
                     };
+                    wrapper.Properties.Add("highvalue", false);
                     break;
                 case LdapTypeEnum.Group:
                     wrapper = new Group(searchResultEntry)
                     {
                         DisplayName = $"{accountName}@{accountDomain}".ToUpper()
                     };
+
+                    if (objectIdentifier.EndsWith("-512") || objectIdentifier.EndsWith("-516") || objectIdentifier.EndsWith("-519") ||
+                        objectIdentifier.EndsWith("-520") || objectIdentifier.Equals("S-1-5-32-544") || objectIdentifier.Equals("S-1-5-32-550") ||
+                        objectIdentifier.Equals("S-1-5-32-549") || objectIdentifier.Equals("S-1-5-32-551") || objectIdentifier.Equals("S-1-5-32-548"))
+                    {
+                        wrapper.Properties.Add("highvalue", true);
+                    }
+                    else
+                    {
+                        wrapper.Properties.Add("highvalue", false);
+                    }
                     break;
                 case LdapTypeEnum.GPO:
                     accountName = searchResultEntry.GetProperty("displayname");
@@ -96,6 +112,7 @@ namespace SharpHound3.Tasks
                     {
                         DisplayName = $"{accountName}@{accountDomain}".ToUpper()
                     };
+                    wrapper.Properties.Add("highvalue", false);
                     break;
                 case LdapTypeEnum.OU:
                     accountName = searchResultEntry.GetProperty("name");
@@ -103,12 +120,14 @@ namespace SharpHound3.Tasks
                     {
                         DisplayName = $"{accountName}@{accountDomain}".ToUpper()
                     };
+                    wrapper.Properties.Add("highvalue", false);
                     break;
                 case LdapTypeEnum.Domain:
                     wrapper = new Domain(searchResultEntry)
                     {
                         DisplayName = accountDomain.ToUpper()
                     };
+                    wrapper.Properties.Add("highvalue", true);
                     break;
                 case LdapTypeEnum.Unknown:
                     wrapper = null;
@@ -126,6 +145,8 @@ namespace SharpHound3.Tasks
             //Set the DN/SID for the wrapper going forward
             wrapper.DistinguishedName = distinguishedName;
             wrapper.Properties.Add("name", wrapper.DisplayName);
+            wrapper.Properties.Add("domain", wrapper.Domain);
+            wrapper.Properties.Add("objectid", objectIdentifier);
             wrapper.ObjectIdentifier = objectIdentifier;
 
             //Return our wrapper for the next step in the pipeline

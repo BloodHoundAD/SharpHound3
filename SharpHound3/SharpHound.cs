@@ -45,6 +45,8 @@ namespace SharpHound3
 
             });
 
+            parser.Dispose();
+
             if (Options.Instance == null)
                 return;
 
@@ -83,6 +85,12 @@ namespace SharpHound3
             var resolved = Options.Instance.ResolvedCollectionMethods;
 
             Console.WriteLine($"Resolved Collection Methods: {resolved}");
+
+            if ((resolved & CollectionMethodResolved.GPOLocalGroup) != 0)
+            {
+                Console.WriteLine("Building Cache for GPOLocalGroup");
+                GPOGroupTasks.BuildOuGplinkCache(Options.Instance.Domain);
+            }
 
             if ((resolved & CollectionMethodResolved.ACL) != 0)
             {
@@ -167,6 +175,28 @@ namespace SharpHound3
                 }
 
                 lastBlock = processContainerBlock;
+            }
+
+            if ((resolved & CollectionMethodResolved.GPOLocalGroup) != 0)
+            {
+                var processGpoLocalGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(GPOGroupTasks.ParseGPOLocalGroups, new ExecutionDataflowBlockOptions
+                {
+                    MaxDegreeOfParallelism = 10,
+                    BoundedCapacity = 250,
+                    EnsureOrdered = false
+                });
+
+                if (!firstLinked)
+                {
+                    findTypeBlock.LinkTo(processGpoLocalGroupBlock, linkOptions, (item) => item != null);
+                    firstLinked = true;
+                }
+                else
+                {
+                    lastBlock.LinkTo(processGpoLocalGroupBlock, linkOptions);
+                }
+
+                lastBlock = processGpoLocalGroupBlock;
             }
 
             //Start computer block here. We want to ping first

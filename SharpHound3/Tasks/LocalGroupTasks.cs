@@ -19,16 +19,33 @@ namespace SharpHound3.Tasks
             {
                 var opts = Options.Instance.ResolvedCollectionMethods;
                 if ((opts & CollectionMethodResolved.DCOM) != 0)
-                    computer.DcomUsers = (await GetNetLocalGroupMembers(computer, LocalGroupRids.DcomUsers)).ToArray();
+                {
+                    var temp = computer.DcomUsers.ToList();
+                    temp.AddRange((await GetNetLocalGroupMembers(computer, LocalGroupRids.DcomUsers)).Distinct());
+                    computer.DcomUsers = temp.ToArray();
+                }
 
                 if ((opts & CollectionMethodResolved.LocalAdmin) != 0)
-                    computer.LocalAdmins = (await GetNetLocalGroupMembers(computer, LocalGroupRids.Administrators)).ToArray();
-
+                {
+                    var temp = computer.LocalAdmins.ToList();
+                    temp.AddRange((await GetNetLocalGroupMembers(computer, LocalGroupRids.Administrators)).Distinct());
+                    computer.LocalAdmins = temp.ToArray();
+                }
+                
                 if ((opts & CollectionMethodResolved.RDP) != 0)
-                    computer.RemoteDesktopUsers = (await GetNetLocalGroupMembers(computer, LocalGroupRids.RemoteDesktopUsers)).ToArray();
+                {
+                    var temp = computer.RemoteDesktopUsers.ToList();
+                    temp.AddRange((await GetNetLocalGroupMembers(computer, LocalGroupRids.RemoteDesktopUsers)).Distinct());
+                    computer.RemoteDesktopUsers = temp.ToArray();
+                }
+                    
 
                 if ((opts & CollectionMethodResolved.PSRemote) != 0)
-                    computer.PSRemoteUsers = (await GetNetLocalGroupMembers(computer, LocalGroupRids.PsRemote)).ToArray();
+                {
+                    var temp = computer.PSRemoteUsers.ToList();
+                    temp.AddRange((await GetNetLocalGroupMembers(computer, LocalGroupRids.PSRemote)).Distinct());
+                    computer.PSRemoteUsers = temp.ToArray();
+                }
             }
 
             return wrapper;
@@ -264,14 +281,6 @@ namespace SharpHound3.Tasks
                 if (members != IntPtr.Zero)
                     SamFreeMemory(members);
             }
-        }
-
-        private enum LocalGroupRids
-        {
-            Administrators = 544,
-            RemoteDesktopUsers = 555,
-            DcomUsers = 562,
-            PsRemote = 580
         }
 
         #region SamRPC Imports

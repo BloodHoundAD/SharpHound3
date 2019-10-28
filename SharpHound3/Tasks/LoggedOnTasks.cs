@@ -69,7 +69,7 @@ namespace SharpHound3.Tasks
                         OutputTasks.AddComputerStatus(new ComputerStatus
                         {
                             ComputerName = computer.DisplayName,
-                            Status = ((NET_API_STATUS) taskResult).ToString(),
+                            Status = ((NetApiStatus) taskResult).ToString(),
                             Task = "NetWkstaUserEnum"
                         });
                     return sessionList;
