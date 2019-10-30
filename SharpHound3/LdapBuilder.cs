@@ -6,7 +6,7 @@ namespace SharpHound3
 {
     internal class LdapBuilder
     {
-        internal static LdapQueryData BuildLdapQuery()
+        internal static LdapQueryData BuildLdapQuery(CollectionMethodResolved methods)
         {
             var ldapFilterParts = new List<string>();
             var ldapProperties = new List<string>();
@@ -16,9 +16,7 @@ namespace SharpHound3
             ldapProperties.Add("samaccountname");
             //LAPS is weird and several collection methods depend on it, but its easier to just have the property in all our collections
             ldapProperties.Add("ms-mcs-admpwdexpirationtime");
-
-            var methods = Options.Instance.ResolvedCollectionMethods;
-
+            
             //Group membership collection
             if (methods.HasFlag(CollectionMethodResolved.Group))
             {

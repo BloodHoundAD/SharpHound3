@@ -10,23 +10,22 @@ namespace SharpHound3.Tasks
         private readonly DirectorySearch _searcher;
         private readonly string _query;
         private readonly string[] _props;
-        private readonly CancellationToken _cancellationToken;
 
-        public LdapProducer(string domain, string query, string[] props, CancellationToken cancellationToken)
+        public LdapProducer(string domain, string query, string[] props)
         {
             _searcher = Helpers.GetDirectorySearcher(domain);
             _query = query;
             _props = props;
-            _cancellationToken = cancellationToken;
         }
 
         public async void ProduceLdap(ITargetBlock<SearchResultEntry> queue)
         {
+            var token = Helpers.GetCancellationToken();
             foreach (var searchResult in _searcher.QueryLdap(_query, _props, SearchScope.Subtree))
             {
-                if (_cancellationToken.IsCancellationRequested)
+                if (token.IsCancellationRequested)
                     break;
-                await queue.SendAsync(searchResult);
+                await queue.SendAsync(searchResult, token);
             }
             queue.Complete();
         }

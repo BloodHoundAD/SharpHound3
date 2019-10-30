@@ -8,7 +8,7 @@ namespace SharpHound3.Tasks
 {
     internal static class ResolveTypeTask
     {
-        internal static LdapWrapper FindLdapType(SearchResultEntry searchResultEntry)
+        internal static LdapWrapper CreateLdapWrapper(SearchResultEntry searchResultEntry)
         {
             //Look for a null DN first. Not sure why this would happen.
             var distinguishedName = searchResultEntry.DistinguishedName;

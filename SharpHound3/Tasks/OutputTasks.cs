@@ -28,6 +28,7 @@ namespace SharpHound3.Tasks
         private static int _currentCount;
         private static Timer _statusTimer;
         private static Stopwatch _runTimer;
+        private static Task _computerStatusTask;
         private static readonly ConcurrentDictionary<string, int> ComputerStatusCount = new ConcurrentDictionary<string, int>();
         private static readonly BlockingCollection<ComputerStatus> ComputerStatusQueue = new BlockingCollection<ComputerStatus>();
 
@@ -81,8 +82,9 @@ namespace SharpHound3.Tasks
             _currentCount++;
         }
 
-        internal static void CompleteOutput()
+        internal static async Task CompleteOutput()
         {
+            PrintStatus();
             Console.WriteLine($"Enumeration finished in {_runTimer.Elapsed}");
             _runTimer.Stop();
             _statusTimer.Stop();
@@ -102,7 +104,7 @@ namespace SharpHound3.Tasks
             string finalName;
             var options = Options.Instance;
 
-            if (options.NoZip)
+            if (options.NoZip || options.NoOutput)
                 return;
 
             if (options.ZipFilename != null)
@@ -149,7 +151,7 @@ namespace SharpHound3.Tasks
                         int source;
                         do
                         {
-                            source = fileStream.Read(buffer, 0, buffer.Length);
+                            source = await fileStream.ReadAsync(buffer, 0, buffer.Length);
                             zipStream.Write(buffer, 0, source);
                         } while (source > 0);
                     }
@@ -163,7 +165,10 @@ namespace SharpHound3.Tasks
             Console.WriteLine("Finished compressing files. Happy graphing!");
 
             if (Options.Instance.DumpComputerStatus)
+            {
                 CompleteComputerStatusOutput();
+                await _computerStatusTask;
+            }
         }
 
         private static string GenerateZipPassword()
@@ -178,9 +183,15 @@ namespace SharpHound3.Tasks
             return builder.ToString();
         }
 
-        internal static Task StartComputerStatusTask()
+        internal static void StartComputerStatusTask()
         {
-            return Task.Factory.StartNew(() =>
+            if (!Options.Instance.DumpComputerStatus)
+            {
+                _computerStatusTask = null;
+                return;
+            }
+
+            _computerStatusTask = Task.Factory.StartNew(() =>
             {
                 var fileName = Helpers.ResolveFileName("computerstatus", "csv", true);
                 var count = 0;
@@ -267,7 +278,7 @@ namespace SharpHound3.Tasks
                     JsonWriter.Flush();
             }
 
-            private JsonTextWriter CreateFile(string baseName)
+            private static JsonTextWriter CreateFile(string baseName)
             {
                 var filename = Helpers.ResolveFileName(baseName, "json", true);
                 UsedFileNames.Add(filename);

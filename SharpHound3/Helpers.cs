@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Heijden.DNS;
 using SharpHound3.Enums;
@@ -28,11 +29,11 @@ namespace SharpHound3
         private static readonly ConcurrentDictionary<string, string> HostResolutionMap = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, Domain> DomainObjectMap = new ConcurrentDictionary<string, Domain>();
         private static readonly ConcurrentDictionary<string, string> DomainNetbiosMap = new ConcurrentDictionary<string, string>();
-        private static readonly ConcurrentDictionary<string, string> AccountNameToSidCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, Resolver> DNSResolverCache = new ConcurrentDictionary<string, Resolver>();
         private static readonly ConcurrentDictionary<string, string> SidToDomainNameCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, bool> PingCache = new ConcurrentDictionary<string, bool>();
         private static readonly Random RandomGen = new Random();
+        private static readonly CancellationTokenSource CancellationTokenSource = new CancellationTokenSource();
 
         internal static readonly string[] ResolutionProps = {"samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname"};
 
@@ -46,8 +47,18 @@ namespace SharpHound3
             0x41, 0x41, 0x41, 0x41, 0x41, 0x00, 0x00, 0x21,
             0x00, 0x01
         };
-        private static Regex SPNRegex = new Regex(@".*\/.*", RegexOptions.Compiled);
+        private static readonly Regex SPNRegex = new Regex(@".*\/.*", RegexOptions.Compiled);
         private static readonly string ProcStartTime = $"{DateTime.Now:yyyyMMddHHmmss}";
+
+        internal static CancellationToken GetCancellationToken()
+        {
+            return CancellationTokenSource.Token;
+        }
+
+        internal static void InvokeCancellation()
+        {
+            CancellationTokenSource.Cancel();
+        }
 
         internal static string ConvertSidToHexSid(string sid)
         {
@@ -383,13 +394,24 @@ namespace SharpHound3
 
         internal static async Task<(bool success, string guid)> DistinguishedNameToGuid(string distinguishedName)
         {
-            if (AccountNameToSidCache.TryGetValue(distinguishedName, out string guid))
-                return (guid != null, guid);
+            if (Cache.Instance.GetPrincipal(distinguishedName, out var resolved))
+            {
+                return (resolved.ObjectIdentifier != null, resolved.ObjectIdentifier);
+            }
 
+            (bool success, string guid) result;
             if (Options.Instance.DomainController != null)
-                return await DistinguishedNameToGuidLdap(distinguishedName);
+                result = await DistinguishedNameToGuidLdap(distinguishedName);
+            else
+                result = DistinguishedNameToGuidTranslateName(distinguishedName);
 
-            return DistinguishedNameToGuidTranslateName(distinguishedName);
+            Cache.Instance.Add(distinguishedName, new ResolvedPrincipal
+            {
+                ObjectIdentifier = result.guid,
+                ObjectType = LdapTypeEnum.OU
+            });
+
+            return result;
         }
 
         private static async Task<(bool success, string guid)> DistinguishedNameToGuidLdap(string dn)
