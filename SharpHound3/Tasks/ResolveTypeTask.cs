@@ -149,6 +149,17 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("objectid", objectIdentifier);
             wrapper.ObjectIdentifier = objectIdentifier;
 
+            Cache.Instance.Add(wrapper.DistinguishedName, new ResolvedPrincipal
+            {
+                ObjectIdentifier = wrapper.ObjectIdentifier,
+                ObjectType = objectType
+            });
+
+            if (objectIdentifier.StartsWith("S-1-5"))
+            {
+                Cache.Instance.Add(wrapper.ObjectIdentifier, objectType);
+            }
+
             //Return our wrapper for the next step in the pipeline
             return wrapper;
         }
