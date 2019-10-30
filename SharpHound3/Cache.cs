@@ -129,7 +129,7 @@ namespace SharpHound3
             {
                 _bhMutex.WaitOne();
                 using (var stream =
-                    new FileStream(finalFilename, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
+                    new FileStream(finalFilename, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
                     stream.Write(jsonCache, 0, jsonCache.Length);
                 }
