@@ -15,12 +15,12 @@ namespace SharpHound3.Tasks
 {
     internal static class ACLTasks
     {
-        private static Dictionary<Type, string> _baseGuids;
+        private static readonly Dictionary<Type, string> BaseGuids;
         private const string AllGuid = "00000000-0000-0000-0000-000000000000";
 
         static ACLTasks()
         {
-            _baseGuids = new Dictionary<Type, string>
+            BaseGuids = new Dictionary<Type, string>
             {
                 {typeof(User), "bf967aba-0de6-11d0-a285-00aa003049e2"},
                 {typeof(Computer), "bf967a86-0de6-11d0-a285-00aa003049e2"},
@@ -43,15 +43,28 @@ namespace SharpHound3.Tasks
             var descriptor = new ActiveDirectorySecurity();
             descriptor.SetSecurityDescriptorBinaryForm(ntSecurityDescriptor);
 
-            var ownerSid = ProcessACESID(descriptor.GetOwner(typeof(SecurityIdentifier)).Value, wrapper.Domain);
+            var ownerSid = ProcessACESID(descriptor.GetOwner(typeof(SecurityIdentifier)).Value);
             if (ownerSid != null)
             {
-                aces.Add(new ACL
+                if (CommonPrincipal.GetCommonSid(ownerSid, out _))
                 {
-                    PrincipalSID = ownerSid,
-                    RightName = "Owner",
-                    AceType = ""
-                });
+                    aces.Add(new ACL
+                    {
+                        PrincipalSID = Helpers.ConvertCommonSid(ownerSid, wrapper.Domain),
+                        RightName = "Owner",
+                        AceType = ""
+                    });
+                }
+                else
+                {
+                    aces.Add(new ACL
+                    {
+                        PrincipalSID = ownerSid,
+                        RightName = "Owner",
+                        AceType = ""
+                    });
+                }
+                
             }
 
             foreach (ActiveDirectoryAccessRule ace in descriptor.GetAccessRules(true,
@@ -66,10 +79,10 @@ namespace SharpHound3.Tasks
                     continue;
 
                 //Check if the ACE actually applies to our object based on the object type
-                if (!IsAceInherited(ace, _baseGuids[wrapper.GetType()]))
+                if (!IsAceInherited(ace, BaseGuids[wrapper.GetType()]))
                     continue;
 
-                var principalSid = ProcessACESID(ace.IdentityReference.Value, wrapper.Domain);
+                var principalSid = ProcessACESID(ace.IdentityReference.Value);
 
                 if (principalSid == null)
                     continue;
@@ -310,22 +323,12 @@ namespace SharpHound3.Tasks
         /// <param name="sid"></param>
         /// <param name="objectDomain"></param>
         /// <returns></returns>
-        private static string ProcessACESID(string sid, string objectDomain)
+        private static string ProcessACESID(string sid)
         { 
             //Ignore Local System/Creator Owner/Principal Self
             if (sid == "S-1-5-18" || sid == "S-1-3-0" || sid == "S-1-5-10")
             {
                 return null;
-            }
-
-            if (sid == "S-1-5-9")
-            {
-                sid = $"{Helpers.GetForestName(objectDomain)}-{sid}";
-            }
-
-            if (CommonPrincipal.GetCommonSid(sid, out _))
-            {
-                sid = Helpers.ConvertCommonSid(sid, objectDomain);
             }
 
             return sid;
