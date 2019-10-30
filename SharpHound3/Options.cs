@@ -108,6 +108,9 @@ namespace SharpHound3
         [Option(HelpText = "Interval in which to display status in milliseconds", Default = 30000)]
         public int StatusInterval { get; set; }
 
+        [Option('v', HelpText = "Enable Verbose Output", Default = false)]
+        public bool Verbose { get; set; }
+
         //Internal Options
         public CollectionMethodResolved ResolvedCollectionMethods { get; set; }
 
