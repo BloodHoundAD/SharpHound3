@@ -22,6 +22,7 @@ namespace SharpHound3.Tasks
                     var temp = computer.DcomUsers.ToList();
                     temp.AddRange((await GetNetLocalGroupMembers(computer, LocalGroupRids.DcomUsers)).Distinct());
                     computer.DcomUsers = temp.ToArray();
+                    await Helpers.DoDelay();
                 }
 
                 if ((opts & CollectionMethodResolved.LocalAdmin) != 0)
@@ -29,6 +30,7 @@ namespace SharpHound3.Tasks
                     var temp = computer.LocalAdmins.ToList();
                     temp.AddRange((await GetNetLocalGroupMembers(computer, LocalGroupRids.Administrators)).Distinct());
                     computer.LocalAdmins = temp.ToArray();
+                    await Helpers.DoDelay();
                 }
                 
                 if ((opts & CollectionMethodResolved.RDP) != 0)
@@ -36,6 +38,7 @@ namespace SharpHound3.Tasks
                     var temp = computer.RemoteDesktopUsers.ToList();
                     temp.AddRange((await GetNetLocalGroupMembers(computer, LocalGroupRids.RemoteDesktopUsers)).Distinct());
                     computer.RemoteDesktopUsers = temp.ToArray();
+                    await Helpers.DoDelay();
                 }
                     
 
@@ -44,6 +47,7 @@ namespace SharpHound3.Tasks
                     var temp = computer.PSRemoteUsers.ToList();
                     temp.AddRange((await GetNetLocalGroupMembers(computer, LocalGroupRids.PSRemote)).Distinct());
                     computer.PSRemoteUsers = temp.ToArray();
+                    await Helpers.DoDelay();
                 }
             }
 

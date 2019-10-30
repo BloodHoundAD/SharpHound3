@@ -1,11 +1,12 @@
-﻿using SharpHound3.JSON;
+﻿using System.Threading.Tasks;
+using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
 
 namespace SharpHound3.Tasks
 {
     internal class ComputerAvailableTasks
     {
-        internal static LdapWrapper CheckSMBOpen(LdapWrapper wrapper)
+        internal static async Task<LdapWrapper> CheckSMBOpen(LdapWrapper wrapper)
         {
             if (wrapper is Computer computer)
             {
@@ -19,6 +20,8 @@ namespace SharpHound3.Tasks
                         Task = "SMBCheck"
                     });
                 }
+
+                await Helpers.DoDelay();
             }
 
             return wrapper;

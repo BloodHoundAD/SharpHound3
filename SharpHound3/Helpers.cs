@@ -32,6 +32,7 @@ namespace SharpHound3
         private static readonly ConcurrentDictionary<string, Resolver> DNSResolverCache = new ConcurrentDictionary<string, Resolver>();
         private static readonly ConcurrentDictionary<string, string> SidToDomainNameCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, bool> PingCache = new ConcurrentDictionary<string, bool>();
+        private static readonly Random RandomGen = new Random();
 
         internal static readonly string[] ResolutionProps = {"samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname"};
 
@@ -507,6 +508,23 @@ namespace SharpHound3
             }
 
             return null;
+        }
+
+        internal static async Task DoDelay()
+        {
+            var opts = Options.Instance;
+            if (opts.Throttle == 0)
+                return;
+
+            if (opts.Jitter == 0)
+            {
+                await Task.Delay(opts.Throttle);
+                return;
+            }
+
+            var percent = (int) Math.Floor((double) (opts.Jitter * (opts.Throttle / 100)));
+            var delay = opts.Throttle + RandomGen.Next(-percent, percent);
+            await Task.Delay(delay);
         }
 
         internal static bool PingHost(string hostname, int port)

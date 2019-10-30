@@ -80,7 +80,7 @@ namespace SharpHound3
         [Option(HelpText = "Skip SMB port checks when connecting to computers", Default = false)]
         public bool SkipPing { get; set; }
 
-        [Option(HelpText="Timeout for SMB port check", Default = 1000)]
+        [Option(HelpText="Timeout for SMB port check", Default = 2000)]
         public int PingTimeout { get; set; }
 
         [Option(HelpText = "Exclude domain controllers from enumeration (useful to avoid Microsoft ATP/ATA)", Default = false)]

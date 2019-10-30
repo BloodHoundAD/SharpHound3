@@ -27,6 +27,8 @@ namespace SharpHound3.Tasks
                 computer.Sessions = temp.Distinct().ToArray();
             }
 
+            await Helpers.DoDelay();
+
             return wrapper;
         }
 
