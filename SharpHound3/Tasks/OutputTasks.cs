@@ -25,11 +25,11 @@ namespace SharpHound3.Tasks
         private static readonly Lazy<JsonFileWriter> DomainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
         private static readonly Lazy<JsonFileWriter> GpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
         private static readonly Lazy<JsonFileWriter> OuOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
-        private static int _lastCount = 0;
-        private static int _currentCount = 0;
+        private static int _lastCount;
+        private static int _currentCount;
         private static Timer _statusTimer;
         private static Stopwatch _runTimer;
-        private static ConcurrentDictionary<string, int> ComputerStatusCount = new ConcurrentDictionary<string, int>();
+        private static readonly ConcurrentDictionary<string, int> ComputerStatusCount = new ConcurrentDictionary<string, int>();
         private static readonly BlockingCollection<ComputerStatus> ComputerStatusQueue = new BlockingCollection<ComputerStatus>();
 
         internal static void StartOutputTimer()
@@ -86,6 +86,7 @@ namespace SharpHound3.Tasks
         {
             Console.WriteLine($"Enumeration finished in {_runTimer.Elapsed}");
             _runTimer.Stop();
+            _statusTimer.Stop();
             if (UserOutput.IsValueCreated)
                 UserOutput.Value.CloseWriter();
             if (ComputerOutput.IsValueCreated)
