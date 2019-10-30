@@ -530,7 +530,7 @@ namespace SharpHound3
                 try
                 {
                     var result = client.BeginConnect(hostname, port, null, null);
-                    var success = result.AsyncWaitHandle.WaitOne(2000);
+                    var success = result.AsyncWaitHandle.WaitOne(Options.Instance.PingTimeout);
                     if (!success) return false;
 
                     client.EndConnect(result);
