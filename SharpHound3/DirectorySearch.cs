@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.DirectoryServices.ActiveDirectory;
 using System.DirectoryServices.Protocols;
+using System.Linq;
 using System.Threading.Tasks;
 using SharpHound3.Enums;
 using SearchOption = System.DirectoryServices.Protocols.SearchOption;
@@ -21,7 +22,7 @@ namespace SharpHound3
         {
             _domainName = domainName;
             _domain = GetDomain();
-            _domainName = _domain.Name;
+            _domainName = Helpers.NormalizeDomainName(domainName);
             _domainController = Options.Instance.DomainController ?? domainController;
             CreateSchemaMap();
         }
@@ -56,27 +57,7 @@ namespace SharpHound3
                         return sids;
                     }
 
-                    if (response.Entries.Count == 0)
-                    {
-                        sids = new string[0];
-                        Cache.Instance.Add(username, sids);
-                        return sids;
-                    }
-
-                    var results = new List<string>();
-
-                    
-
-                    foreach (SearchResultEntry entry in response.Entries)
-                    {
-                        var sid = entry.GetSid();
-                        if (sid != null)
-                        {
-                            results.Add(sid);
-                        }
-                    }
-
-                    sids = results.ToArray();
+                    sids = response.Entries.Cast<SearchResultEntry>().Select(entry => entry.GetSid()).Where(sid => sid != null).ToArray();
                     Cache.Instance.Add(username, sids);
                     return sids;
 
@@ -272,7 +253,7 @@ namespace SharpHound3
         {
             var domainController = _domainController ?? _domainName;
 
-            var identifier = new LdapDirectoryIdentifier(domainController, 3628, false, false);
+            var identifier = new LdapDirectoryIdentifier(domainController, 3268);
             var connection = new LdapConnection(identifier);
 
             var ldapSessionOptions = connection.SessionOptions;
