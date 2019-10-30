@@ -8,7 +8,7 @@
     <ProjectGuid>{A517A8DE-5834-411D-ABDA-2D0E1766539C}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>SharpHound3</RootNamespace>
-    <AssemblyName>SharpHound3</AssemblyName>
+    <AssemblyName>SharpHound</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -102,11 +102,13 @@
     <Compile Include="Tasks\LocalGroupTasks.cs" />
     <Compile Include="Tasks\LoggedOnTasks.cs" />
     <Compile Include="Tasks\OutputTasks.cs" />
+    <Compile Include="Tasks\PipelineBuilder.cs" />
     <Compile Include="Tasks\ResolveTypeTask.cs" />
     <Compile Include="Tasks\LdapProducer.cs" />
     <Compile Include="Tasks\ObjectPropertyTasks.cs" />
     <Compile Include="Tasks\ACLTasks.cs" />
     <Compile Include="Tasks\NetSessionTasks.cs" />
+    <Compile Include="Tasks\TrustTasks.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
