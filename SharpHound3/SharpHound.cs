@@ -70,15 +70,17 @@ namespace SharpHound3
             {
                 PropagateCompletion = true
             };
+
+            var executionOptions = new ExecutionDataflowBlockOptions
+            {
+                EnsureOrdered = false,
+                MaxDegreeOfParallelism = 10,
+                BoundedCapacity = 500
+            };
             var firstLinked = false;
 
             //FindType is always the first block
-            var findTypeBlock = new TransformBlock<SearchResultEntry, LdapWrapper>(ResolveTypeTask.FindLdapType, new ExecutionDataflowBlockOptions
-            {
-                MaxDegreeOfParallelism = 10,
-                BoundedCapacity = 250,
-                EnsureOrdered = false
-            });
+            var findTypeBlock = new TransformBlock<SearchResultEntry, LdapWrapper>(ResolveTypeTask.FindLdapType, executionOptions);
 
             findTypeBlock.LinkTo(DataflowBlock.NullTarget<LdapWrapper>(), (item) => item == null);
 
@@ -86,20 +88,9 @@ namespace SharpHound3
 
             Console.WriteLine($"Resolved Collection Methods: {resolved}");
 
-            if ((resolved & CollectionMethodResolved.GPOLocalGroup) != 0)
-            {
-                Console.WriteLine("Building Cache for GPOLocalGroup");
-                GPOGroupTasks.BuildOuGplinkCache(Options.Instance.Domain);
-            }
-
             if ((resolved & CollectionMethodResolved.ACL) != 0)
             {
-                var processDaclBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ACLTasks.ProcessDACL, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250,
-                    EnsureOrdered = false
-                });
+                var processDaclBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ACLTasks.ProcessDACL, executionOptions);
                 findTypeBlock.LinkTo(processDaclBlock, linkOptions, (item) => item != null);
                 firstLinked = true;
 
@@ -108,12 +99,7 @@ namespace SharpHound3
 
             if ((resolved & CollectionMethodResolved.Group) != 0)
             {
-                var processGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(GroupEnumerationTasks.ProcessGroupMembership, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 20,
-                    BoundedCapacity = 250,
-                    EnsureOrdered = false
-                });
+                var processGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(GroupEnumerationTasks.ProcessGroupMembership, executionOptions);
 
                 if (!firstLinked)
                 {
@@ -130,12 +116,7 @@ namespace SharpHound3
 
             if ((resolved & CollectionMethodResolved.ObjectProps) != 0)
             {
-                var processPropertiesBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ObjectPropertyTasks.ResolveObjectProperties, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250,
-                    EnsureOrdered = false
-                });
+                var processPropertiesBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ObjectPropertyTasks.ResolveObjectProperties, executionOptions);
 
                 if (!firstLinked)
                 {
@@ -157,12 +138,7 @@ namespace SharpHound3
 
             if ((resolved & CollectionMethodResolved.Container) != 0)
             {
-                var processContainerBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ContainerTasks.EnumerateContainer, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250,
-                    EnsureOrdered = false
-                });
+                var processContainerBlock = new TransformBlock<LdapWrapper, LdapWrapper>(ContainerTasks.EnumerateContainer, executionOptions);
 
                 if (!firstLinked)
                 {
@@ -179,12 +155,7 @@ namespace SharpHound3
 
             if ((resolved & CollectionMethodResolved.GPOLocalGroup) != 0)
             {
-                var processGpoLocalGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(GPOGroupTasks.ParseGPOLocalGroups, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250,
-                    EnsureOrdered = false
-                });
+                var processGpoLocalGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(GPOGroupTasks.ParseGPOLocalGroups, executionOptions);
 
                 if (!firstLinked)
                 {
@@ -202,12 +173,7 @@ namespace SharpHound3
             //Start computer block here. We want to ping first
             if (!Options.Instance.SkipPing && Options.Instance.IsComputerCollectionSet())
             {
-                var pingTask = new TransformBlock<LdapWrapper, LdapWrapper>(ComputerAvailableTasks.CheckSMBOpen, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250,
-                    EnsureOrdered = false
-                });
+                var pingTask = new TransformBlock<LdapWrapper, LdapWrapper>(ComputerAvailableTasks.CheckSMBOpen, executionOptions);
 
                 if (!firstLinked)
                 {
@@ -224,11 +190,7 @@ namespace SharpHound3
 
             if ((resolved & CollectionMethodResolved.Sessions) != 0)
             {
-                var processSessionsBlock = new TransformBlock<LdapWrapper,LdapWrapper>(NetSessionTasks.ProcessNetSessions, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250
-                });
+                var processSessionsBlock = new TransformBlock<LdapWrapper,LdapWrapper>(NetSessionTasks.ProcessNetSessions, executionOptions);
 
                 if (!firstLinked)
                 {
@@ -245,12 +207,7 @@ namespace SharpHound3
 
             if ((resolved & CollectionMethodResolved.LoggedOn) != 0)
             {
-                var processLoggedonBlock = new TransformBlock<LdapWrapper, LdapWrapper>(LoggedOnTasks.ProcessLoggedOn, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 10,
-                    BoundedCapacity = 250,
-                    EnsureOrdered = false
-                });
+                var processLoggedonBlock = new TransformBlock<LdapWrapper, LdapWrapper>(LoggedOnTasks.ProcessLoggedOn, executionOptions);
 
                 if (!firstLinked)
                 {
@@ -269,12 +226,7 @@ namespace SharpHound3
                 (resolved & CollectionMethodResolved.LocalAdmin) != 0 ||
                 (resolved & CollectionMethodResolved.PSRemote) != 0)
             {
-                var processLocalGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(LocalGroupTasks.GetLocalGroupMembers, new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 20,
-                    BoundedCapacity = 250,
-                    EnsureOrdered = false
-                });
+                var processLocalGroupBlock = new TransformBlock<LdapWrapper, LdapWrapper>(LocalGroupTasks.GetLocalGroupMembers, executionOptions);
 
                 if (!firstLinked)
                 {

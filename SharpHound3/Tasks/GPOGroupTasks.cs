@@ -9,10 +9,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.XPath;
+using Newtonsoft.Json;
 using SharpHound3.Enums;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
-using Group = System.Text.RegularExpressions.Group;
 
 namespace SharpHound3.Tasks
 {
@@ -22,64 +22,232 @@ namespace SharpHound3.Tasks
         private static readonly Regex MemberRegex = new Regex(@"\[Group Membership\](.*)(?:\[|$)", RegexOptions.Compiled | RegexOptions.Singleline);
         private static readonly Regex MemberLeftRegex = new Regex(@"(.*(?:S-1-5-32-544|S-1-5-32-555|S-1-5-32-562)__Members)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex MemberRightRegex = new Regex(@"(S-1-5-32-544|S-1-5-32-555|S-1-5-32-562)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly Regex ExtractRid = new Regex(@"S-1-5-32-([0-9]{3})", RegexOptions.Compiled);
-        private static ConcurrentDictionary<string, List<(string ouDistinguishedName, bool enabled)>> OuGPLinkCache = null;
-        internal static void BuildOuGplinkCache(string domain)
+        private static readonly Regex ExtractRid = new Regex(@"S-1-5-32-([0-9]{3})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly ConcurrentDictionary<string, List<GroupAction>> GpoActionCache = new ConcurrentDictionary<string, List<GroupAction>>();
+
+        private static readonly (string groupName, LocalGroupRids rid)[] ValidGroupNames =
         {
-            if (OuGPLinkCache == null)
-                OuGPLinkCache = new ConcurrentDictionary<string, List<(string ouGuid, bool enabled)>>();
-            var searcher = Helpers.GetDirectorySearcher(domain);
+            ("Administrators", LocalGroupRids.Administrators),
+            ("Remote Desktop Users", LocalGroupRids.RemoteDesktopUsers),
+            ("Remote Management Users", LocalGroupRids.PSRemote),
+            ("Distributed COM Users", LocalGroupRids.DcomUsers)
+        };
 
-            foreach (var ou in searcher.QueryLdap("(&(objectclass=organizationalunit)(gplink=*))", new[] {"gplink"},
-                SearchScope.Subtree))
-            {
-                var gpLinks = ou.GetProperty("gplink");
-                var ouDistinguishedName = ou.DistinguishedName;
-
-                //Split the GPLinks up on the OU and start parsing them
-                foreach (var link in gpLinks.Split(']', '[').Where(l => l.StartsWith("LDAP")))
-                {
-                    var splitLink = link.Split(';');
-                    var status = splitLink[1];
-                    var gpoDistinguishedName = splitLink[0];
-                    gpoDistinguishedName =
-                        gpoDistinguishedName.Substring(gpoDistinguishedName.IndexOf("CN=", StringComparison.OrdinalIgnoreCase));
-
-                    var enabled = !(status == "1" || status == "3");
-                    OuGPLinkCache.AddOrUpdate(gpoDistinguishedName.ToUpper(), new List<(string ouDistinguishedName, bool enabled)> {(ouDistinguishedName, enabled)}, 
-                        (s, list) =>
-                        {
-                            list.Add((ouDistinguishedName, enabled));
-                            return list;
-                        });
-                }
-            }
-        }
         internal static async Task<LdapWrapper> ParseGPOLocalGroups(LdapWrapper wrapper)
         {
-            if (wrapper is GPO gpo)
+            if (wrapper is OU ou)
             {
-                await ParseGPO(gpo);
+                await ParseOUNew(ou);
             }
 
             return wrapper;
         }
 
-        private static async Task ParseGPO(GPO gpo)
+        private static async Task ParseOUNew(OU ou)
         {
-            var searchResultEntry = gpo.SearchResult;
-            var filePath = searchResultEntry.GetProperty("gpcfilesyspath");
+            var searchResultEntry = ou.SearchResult;
 
-            if (filePath == null)
+            var gpLinks = searchResultEntry.GetProperty("gplink");
+
+            //Check if we can get gplinks first. If not, move on, theres no point
+            if (gpLinks == null)
                 return;
 
-            var resolvedList = new List<TempStorage>();
-            var templatePath = $"{filePath}\\MACHINE\\Microsoft\\Windows NT\\SecEdit\\GptTmpl.inf";
+            //First lets see if this group contains computers. If not, we'll ignore it
+            var searcher = Helpers.GetDirectorySearcher(ou.Domain);
+            var affectedComputers = new List<string>();
+            foreach (var computerResult in searcher.QueryLdap("(samaccounttype=805306369)", new[] {"objectsid"},
+                SearchScope.Subtree, ou.DistinguishedName))
+            {
+                var sid = computerResult.GetSid();
+                if (sid == null)
+                    continue;
 
-            //Parse GptTmpl files
+                affectedComputers.Add(sid);
+            }
+
+            //If we have no computers, then theres no more processsing to do here.
+            //Searching for computers is WAY less expensive than trying to parse the entire gplink structure first
+            if (affectedComputers.Count == 0)
+                return;
+
+            
+            var links = gpLinks.Split(']', '[').Where(link => link.StartsWith("LDAP", true, null)).ToList();
+            var enforced = new List<string>();
+            var unenforced = new List<string>();
+
+            //Remove disabled links and then split enforced and unenforced links up
+            foreach (var link in links)
+            {
+                var status = link.Split(';')[1];
+                if (status == "1" || status == "3")
+                    continue;
+
+                if (status == "0")
+                    unenforced.Add(link);
+
+                if (status == "2")
+                    enforced.Add(link);
+            }
+
+            //Recreate our list with enforced links in order at the end to model application order properly
+            links = new List<string>();
+            links.AddRange(unenforced);
+            links.AddRange(enforced);
+
+            var data = new Dictionary<LocalGroupRids, GroupResults>();
+            foreach (var rid in Enum.GetValues(typeof(LocalGroupRids)))
+            {
+                data[(LocalGroupRids)rid] = new GroupResults();
+            }
+
+            foreach (var link in links)
+            {
+                var split = link.Split(';');
+                var gpoDistinguishedName = split[0];
+                gpoDistinguishedName =
+                    gpoDistinguishedName.Substring(gpoDistinguishedName.IndexOf("CN=",
+                        StringComparison.OrdinalIgnoreCase));
+
+                if (!GpoActionCache.TryGetValue(gpoDistinguishedName, out var actions))
+                {
+                    actions = new List<GroupAction>();
+                    var gpoDomain = Helpers.DistinguishedNameToDomain(gpoDistinguishedName);
+                    var gpoResult = await searcher.GetOne("(objectclass=*)", new[] {"gpcfilesyspath"}, SearchScope.Base,
+                        gpoDistinguishedName);
+
+                    var baseFilePath = gpoResult?.GetProperty("gpcfilesyspath");
+
+                    if (baseFilePath == null)
+                    {
+                        GpoActionCache.TryAdd(gpoDistinguishedName, actions);
+                        continue;
+                    }
+
+                    actions.AddRange(await ProcessGPOXml(baseFilePath));
+                    actions.AddRange(await ProcessGPOTmpl(baseFilePath, gpoDomain));
+                }
+
+                GpoActionCache.TryAdd(gpoDistinguishedName, actions);
+
+                if (actions.Count == 0)
+                    continue;
+
+                var restrictedMemberSets = actions.Where(x => x.Target == GroupActionTarget.RestrictedMember)
+                        .Select(x => (x.TargetRid, x.TargetSid, x.TargetType)).GroupBy(x => x.TargetRid);
+
+                foreach (var set in restrictedMemberSets)
+                {
+                    var results = data[set.Key];
+                    var members = set.Select(x => new GenericMember
+                    {
+                        MemberId = x.TargetSid,
+                        MemberType = x.TargetType
+                    }).ToList();
+                    results.RestrictedMember = members;
+                    data[set.Key] = results;
+                }
+
+                var restrictedMemberOfSets = actions.Where(x => x.Target == GroupActionTarget.RestrictedMemberOf)
+                    .Select(x => (x.TargetRid, x.TargetSid, x.TargetType)).GroupBy(x => x.TargetRid);
+
+                foreach (var set in restrictedMemberOfSets)
+                {
+                    var results = data[set.Key];
+                    var members = set.Select(x => new GenericMember
+                    {
+                        MemberId = x.TargetSid,
+                        MemberType = x.TargetType
+                    }).ToList();
+                    results.RestrictedMemberOf.AddRange(members);
+                    data[set.Key] = results;
+                }
+
+                var restrictedLocalGroupSets = actions.Where(x => x.Target == GroupActionTarget.LocalGroup)
+                    .Select(x => (x.TargetRid, x.TargetSid, x.TargetType, x.Action)).GroupBy(x => x.TargetRid);
+
+                foreach (var set in restrictedLocalGroupSets)
+                {
+                    var results = data[set.Key];
+                    foreach (var gAction in set)
+                    {
+                        var action = gAction.Action;
+                        var groupResults = results.LocalGroups;
+                        if (action == GroupActionOperation.DeleteGroups)
+                        {
+                            groupResults.RemoveAll(x => x.MemberType == LdapTypeEnum.Group);
+                        }
+
+                        if (action == GroupActionOperation.DeleteUsers)
+                        {
+                            groupResults.RemoveAll(x => x.MemberType == LdapTypeEnum.User);
+                        }
+
+                        if (action == GroupActionOperation.Add)
+                        {
+                            groupResults.Add(new GenericMember
+                            {
+                                MemberType = gAction.TargetType,
+                                MemberId = gAction.TargetSid
+                            });
+                        }
+
+                        if (action == GroupActionOperation.Delete)
+                        {
+                            groupResults.RemoveAll(x => x.MemberId == gAction.TargetSid);
+                        }
+
+                        data[set.Key].LocalGroups = groupResults;
+                    }
+                }
+            }
+
+            foreach (var x in data)
+            {
+                var restrictedMember = x.Value.RestrictedMember;
+                var restrictedMemberOf = x.Value.RestrictedMemberOf;
+                var groupMember = x.Value.LocalGroups;
+                var finalMembers = new List<GenericMember>();
+                if (restrictedMember.Count > 0)
+                {
+                    finalMembers.AddRange(restrictedMember);
+                    finalMembers.AddRange(restrictedMemberOf);
+                }
+                else
+                {
+                    finalMembers.AddRange(restrictedMemberOf);
+                    finalMembers.AddRange(groupMember);
+                }
+
+                finalMembers = finalMembers.Distinct().ToList();
+                switch (x.Key)
+                {
+                    case LocalGroupRids.Administrators:
+                        ou.LocalAdmins = finalMembers.ToArray();
+                        break;
+                    case LocalGroupRids.RemoteDesktopUsers:
+                        ou.RemoteDesktopUsers = finalMembers.ToArray();
+                        break;
+                    case LocalGroupRids.DcomUsers:
+                        ou.DcomUsers = finalMembers.ToArray();
+                        break;
+                    case LocalGroupRids.PSRemote:
+                        ou.PSRemoteUsers = finalMembers.ToArray();
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+
+        private static async Task<List<GroupAction>> ProcessGPOTmpl(string basePath, string gpoDomain)
+        {
+            var actions = new List<GroupAction>();
+            var templatePath = $"{basePath}\\MACHINE\\Microsoft\\Windows NT\\SecEdit\\GptTmpl.inf";
+
             if (File.Exists(templatePath))
             {
-                using (var reader = new StreamReader(new FileStream(templatePath, FileMode.Open)))
+                using (var reader = new StreamReader(new FileStream(templatePath, FileMode.Open, FileAccess.Read)))
                 {
                     var content = await reader.ReadToEndAsync();
                     var memberMatch = MemberRegex.Match(content);
@@ -104,21 +272,28 @@ namespace SharpHound3.Tasks
                             {
                                 var extracted = ExtractRid.Match(leftMatch.Value);
                                 var rid = int.Parse(extracted.Groups[1].Value);
-                                foreach (var member in val.Split(','))
+                                if (Enum.IsDefined(typeof(LocalGroupRids), rid))
                                 {
-                                    var (success, sid) = await GetSid(member.Trim('*'), gpo.Domain);
-                                    if (!success)
-                                        continue;
-                                    var type = await Helpers.LookupSidType(sid);
-                                    resolvedList.Add(new TempStorage{
-                                        GroupRID = rid,
-                                        MemberSid = sid,
-                                        MemberType = type
-                                    });
+                                    foreach (var member in val.Split(','))
+                                    {
+                                        var (success, sid) = await GetSid(member.Trim('*'), gpoDomain);
+                                        if (!success)
+                                            continue;
+                                        var type = await Helpers.LookupSidType(sid);
+                                        actions.Add(new GroupAction
+                                        {
+                                            Target = GroupActionTarget.RestrictedMember,
+                                            Action = GroupActionOperation.Add,
+                                            TargetSid = sid,
+                                            TargetType = type,
+                                            TargetRid = (LocalGroupRids)rid
+                                        });
+                                    }
                                 }
+                                
                             }
 
-                            //Secnario 2: A group has been set as memberOf to one of our local groups
+                            //Scenario 2: A group has been set as memberOf to one of our local groups
                             var index = key.IndexOf("MemberOf", StringComparison.CurrentCultureIgnoreCase);
                             if (rightMatches.Count > 0 && index > 0)
                             {
@@ -128,12 +303,18 @@ namespace SharpHound3.Tasks
                                 foreach (var match in rightMatches)
                                 {
                                     var rid = int.Parse(ExtractRid.Match(match.ToString()).Groups[1].Value);
-                                    resolvedList.Add(new TempStorage
+                                    if (Enum.IsDefined(typeof(LocalGroupRids), rid))
                                     {
-                                        MemberType = type,
-                                        GroupRID = rid,
-                                        MemberSid = sid
-                                    });
+                                        var targetGroup = (LocalGroupRids) rid;
+                                        actions.Add(new GroupAction
+                                        {
+                                            Target = GroupActionTarget.RestrictedMemberOf,
+                                            Action = GroupActionOperation.Add,
+                                            TargetRid = targetGroup,
+                                            TargetSid = sid,
+                                            TargetType = type
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -141,52 +322,143 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            var xmlPath = $"{filePath}\\MACHINE\\Preferences\\Groups\\Groups.xml";
+            return actions;
+        }
+
+        private static async Task<List<GroupAction>> ProcessGPOXml(string basePath)
+        {
+            var actions = new List<GroupAction>();
+            var xmlPath = $"{basePath}\\MACHINE\\Preferences\\Groups\\Groups.xml";
             if (File.Exists(xmlPath))
             {
-                Console.WriteLine(xmlPath);
                 var doc = new XPathDocument(xmlPath);
                 var navigator = doc.CreateNavigator();
-                var groupNodes = navigator.Select("/Groups/Group");
-
-                while (groupNodes.MoveNext())
+                var groupsNodes = navigator.Select("/Groups");
+                while (groupsNodes.MoveNext())
                 {
-                    var properties = groupNodes.Current.Select("Properties");
-                    while (properties.MoveNext())
+                    var disabled = groupsNodes.Current.GetAttribute("disabled", "") == "1";
+                    if (disabled)
+                        continue;
+
+                    var groupNodes = groupsNodes.Current.Select("Group");
+                    while (groupNodes.MoveNext())
                     {
-                        var groupSid = properties.Current.GetAttribute("groupSid", "");
-                        if (string.IsNullOrEmpty(groupSid))
-                            continue;
-
-                        var sidMatch = ExtractRid.Match(groupSid);
-                        if (!sidMatch.Success)
-                            continue;
-
-                        var rid = int.Parse(sidMatch.Groups[1].Value);
-
-                        if (!Enum.IsDefined(typeof(LocalGroupRids), rid))
-                            continue;
-
-                        var members = properties.Current.Select("Members");
-                        while (members.MoveNext())
+                        var groupProperties = groupNodes.Current.Select("Properties");
+                        while (groupProperties.MoveNext())
                         {
-                            var member = members.Current.Select("Member");
-                            while (member.MoveNext())
-                            {
-                                var action = member.Current.GetAttribute("action", "");
-                                if (action == "ADD")
-                                {
-                                    var sid = member.Current.GetAttribute("sid", "");
-                                    if (string.IsNullOrEmpty(sid))
-                                        continue;
+                            var currentProperties = groupProperties.Current;
+                            var action = currentProperties.GetAttribute("action", "");
+                            //We only want to look at action = update, because the other ones dont work on Built In groups
+                            if (!action.Equals("u", StringComparison.OrdinalIgnoreCase))
+                                continue;
 
-                                    var type = await Helpers.LookupSidType(sid);
-                                    resolvedList.Add(new TempStorage
+                            var groupSid = currentProperties.GetAttribute("groupSid", "");
+                            var groupName = currentProperties.GetAttribute("groupName", "");
+                            LocalGroupRids? targetGroup = null;
+
+                            //Determine the group we're targetting
+                            //Try to use the groupSid first
+                            if (!string.IsNullOrEmpty(groupSid))
+                            {
+                                var sidMatch = ExtractRid.Match(groupSid);
+                                if (sidMatch.Success)
+                                {
+                                    var rid = int.Parse(sidMatch.Groups[1].Value);
+                                    if (Enum.IsDefined(typeof(LocalGroupRids), rid))
+                                        targetGroup = (LocalGroupRids)rid;
+                                }
+                            }
+
+                            //If that fails, try to use the groupName
+                            if (targetGroup == null)
+                            {
+                                if (!string.IsNullOrEmpty(groupName))
+                                {
+                                    var group = ValidGroupNames.FirstOrDefault(g =>
+                                        g.groupName.Equals(groupName, StringComparison.OrdinalIgnoreCase));
+
+                                    if (group != default)
                                     {
-                                        GroupRID = rid,
-                                        MemberSid = sid,
-                                        MemberType = type
+                                        targetGroup = group.rid;
+                                    }
+                                }
+                            }
+
+                            //We failed to resolve a group to target so continue
+                            if (targetGroup == null)
+                                continue;
+
+                            var deleteUsers = currentProperties.GetAttribute("deleteAllUsers", "") == "1";
+                            var deleteGroups = currentProperties.GetAttribute("deleteAllGroups", "") == "1";
+
+                            if (deleteUsers)
+                            {
+                                actions.Add(new GroupAction
+                                {
+                                    Action = GroupActionOperation.DeleteUsers,
+                                    Target = GroupActionTarget.LocalGroup,
+                                    TargetRid = (LocalGroupRids) targetGroup
+                                });
+                            }
+
+                            if (deleteGroups)
+                            {
+                                actions.Add(new GroupAction
+                                {
+                                    Action = GroupActionOperation.DeleteGroups,
+                                    Target = GroupActionTarget.LocalGroup,
+                                    TargetRid = (LocalGroupRids)targetGroup
+                                });
+                            }
+
+                            var members = currentProperties.Select("Members/Member");
+
+                            while (members.MoveNext())
+                            {
+                                var memberAction = members.Current.GetAttribute("action", "").Equals("ADD", StringComparison.CurrentCulture) ? GroupActionOperation.Add : GroupActionOperation.Delete;
+                                var memberName = members.Current.GetAttribute("name", "");
+                                var memberSid = members.Current.GetAttribute("sid", "");
+                                LdapTypeEnum memberType;
+
+                                if (!string.IsNullOrEmpty(memberSid))
+                                {
+                                    memberType = await Helpers.LookupSidType(memberSid);
+
+                                    actions.Add(new GroupAction
+                                    {
+                                        Action = memberAction,
+                                        Target = GroupActionTarget.LocalGroup,
+                                        TargetSid = memberSid,
+                                        TargetType = memberType,
+                                        TargetRid = (LocalGroupRids)targetGroup
                                     });
+                                    continue;
+                                }
+
+                                if (!string.IsNullOrEmpty(memberName))
+                                {
+                                    if (memberName.Contains("\\"))
+                                    {
+                                        var splitMember = memberName.Split('\\');
+                                        memberName = splitMember[1];
+                                        var memberDomain = splitMember[0];
+                                        var (success, lookupSid) =
+                                            await Helpers.AccountNameToSid(memberName, memberDomain, false);
+
+
+                                        if (success)
+                                        {
+                                            memberType = await Helpers.LookupSidType(lookupSid);
+                                            actions.Add(new GroupAction
+                                            {
+                                                Action = memberAction,
+                                                Target = GroupActionTarget.LocalGroup,
+                                                TargetSid = lookupSid,
+                                                TargetType = memberType,
+                                                TargetRid = (LocalGroupRids)targetGroup
+                                            });
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -194,92 +466,7 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            Console.WriteLine(resolvedList.Count);
-            //If we dont have any objects set for some reason, just move on, this GPO is done processing.
-            if (resolvedList.Count == 0)
-                return;
-
-            //Next we need to determine what computers are affected by this GPO
-            var searcher = Helpers.GetDirectorySearcher(gpo.Domain);
-            var dn = gpo.DistinguishedName;
-            var affectedComputers = new List<string>();
-
-            //Check our cache first, this is a huge performance plus
-            if (OuGPLinkCache.TryGetValue(dn.ToUpper(), out var cache))
-            {
-                // Loop over each OU this GPO is linked too
-                foreach (var (ouDistinguishedName, enabled) in cache)
-                {
-                    //If the GPLink isn't enabled, just ignore it
-                    if (!enabled)
-                        continue;
-
-                    Console.WriteLine($"{ouDistinguishedName} enabled");
-                    //Get the computers in the OU
-                    foreach (var computer in searcher.QueryLdap("(samaccounttype=805306369)", new[] {"objectsid"},
-                        SearchScope.Subtree, ouDistinguishedName))
-                    {
-                        Console.WriteLine(computer.DistinguishedName);
-                        var computerSid = computer.GetSid();
-                        if (computerSid != null)
-                            affectedComputers.Add(computerSid);
-                    }
-                }
-            }
-            else
-            {
-                Console.WriteLine("Missed cache");
-                //This shouldn't happen, but its here as a backup
-                foreach (var linkedOu in searcher.QueryLdap($"(&(objectclass=organizationalUnit)(gplink=*{dn}*))",
-                    new[] {"distinguishedname"}, SearchScope.Subtree))
-                {
-                    var ouDistinguishedName = linkedOu.DistinguishedName;
-
-                    foreach (var computer in searcher.QueryLdap("(samaccounttype=805306369)", new[] {"objectsid"},
-                        SearchScope.Subtree, ouDistinguishedName))
-                    {
-                        var computerSid = computer.GetSid();
-                        if (computerSid != null)
-                            affectedComputers.Add(computerSid);
-                    }
-                }
-            }
-
-            //If we dont have any computers this GPO affects, just move on
-            if (affectedComputers.Count == 0)
-                return;
-
-            var finalAffectedComputers = affectedComputers.Distinct().ToArray();
-            gpo.AffectedComputers = finalAffectedComputers;
-
-            //Use LINQ to create our final arrays
-            gpo.LocalAdmins = resolvedList.Where((x) => x.GroupRID == (int) LocalGroupRids.Administrators).Select((x) =>
-                new GenericMember
-                {
-                    MemberType = LdapTypeEnum.Computer,
-                    MemberId = x.MemberSid
-                }).ToArray();
-
-            gpo.DcomUsers = resolvedList.Where((x) => x.GroupRID == (int)LocalGroupRids.DcomUsers).Select((x) =>
-                new GenericMember
-                {
-                    MemberType = LdapTypeEnum.Computer,
-                    MemberId = x.MemberSid
-                }).ToArray();
-
-            gpo.RemoteDesktopUsers = resolvedList.Where((x) => x.GroupRID == (int)LocalGroupRids.RemoteDesktopUsers).Select((x) =>
-                new GenericMember
-                {
-                    MemberType = LdapTypeEnum.Computer,
-                    MemberId = x.MemberSid
-                }).ToArray();
-
-            gpo.PSRemoteUsers = resolvedList.Where((x) => x.GroupRID == (int)LocalGroupRids.PSRemote).Select((x) =>
-                new GenericMember
-                {
-                    MemberType = LdapTypeEnum.Computer,
-                    MemberId = x.MemberSid
-                }).ToArray();
+            return actions;
         }
 
         private static async Task<(bool success, string sid)> GetSid(string element, string domainName)
@@ -326,6 +513,42 @@ namespace SharpHound3.Tasks
             internal int GroupRID { get; set; }
             internal string MemberSid { get; set; }
             internal LdapTypeEnum MemberType { get; set; }
+        }
+
+        private class GroupAction
+        {
+            internal GroupActionOperation Action { get; set; }
+            internal GroupActionTarget Target { get; set; }
+            internal string TargetSid { get; set; }
+            internal LdapTypeEnum TargetType { get; set; }
+            internal LocalGroupRids TargetRid { get; set; }
+
+            public override string ToString()
+            {
+                return $"{nameof(Action)}: {Action}, {nameof(Target)}: {Target}, {nameof(TargetSid)}: {TargetSid}, {nameof(TargetType)}: {TargetType}, {nameof(TargetRid)}: {TargetRid}";
+            }
+        }
+
+        public class GroupResults
+        {
+            public List<GenericMember> RestrictedMemberOf = new List<GenericMember>();
+            public List<GenericMember> RestrictedMember = new List<GenericMember>();
+            public List<GenericMember> LocalGroups = new List<GenericMember>();
+        }
+
+        private enum GroupActionOperation
+        {
+            Add,
+            Delete,
+            DeleteUsers,
+            DeleteGroups
+        }
+
+        private enum GroupActionTarget
+        {
+            RestrictedMemberOf,
+            RestrictedMember,
+            LocalGroup
         }
     }
 }

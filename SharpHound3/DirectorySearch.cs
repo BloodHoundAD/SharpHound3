@@ -23,7 +23,6 @@ namespace SharpHound3
         private readonly Domain _domain;
         private Dictionary<string, string> _domainGuidMap;
         private readonly ConcurrentBag<LdapConnection> _connectionPool = new ConcurrentBag<LdapConnection>();
-        private static int _connectionCount = 0;
 
         public DirectorySearch(string domainName = null, string domainController = null)
         {
@@ -276,11 +275,6 @@ namespace SharpHound3
             }
         }
 
-        private DirectoryContext GetDomainContext()
-        {
-            return new DirectoryContext(DirectoryContextType.Domain, _domainName);
-        }
-
         private LdapConnection GetGlobalCatalogConnection()
         {
             var domainController = _domainController ?? _domainName;
@@ -308,9 +302,6 @@ namespace SharpHound3
             {
                 return connection;
             }
-
-            Interlocked.Increment(ref _connectionCount);
-            Console.WriteLine($"Connection Count: {_connectionCount}");
 
             var domainController = _domainController ?? _domainName;
             var port = Options.Instance.LdapPort == 0

@@ -40,7 +40,7 @@ namespace SharpHound3
 
             if (methods.HasFlag(CollectionMethodResolved.ACL))
             {
-                ldapFilterParts.Add("(|(samAccountType=805306368)(samAccountType=805306369)(samAccountType=268435456)(samAccountType=268435457)(samAccountType=536870912)(samAccountType=536870913)(objectClass=domain)(objectCategory=groupPolicyContainer))");
+                ldapFilterParts.Add("(|(samAccountType=805306368)(samAccountType=805306369)(samAccountType=268435456)(samAccountType=268435457)(samAccountType=536870912)(samAccountType=536870913)(objectClass=domain)(objectCategory=groupPolicyContainer)(objectcategory=organizationalUnit))");
                 ldapProperties.AddRange(new []
                 {
                     "ntsecuritydescriptor", "displayname", "name"
@@ -73,8 +73,10 @@ namespace SharpHound3
 
             if (methods.HasFlag(CollectionMethodResolved.GPOLocalGroup))
             {
-                ldapFilterParts.Add("(&(objectCategory=groupPolicyContainer)(name=*)(gpcfilesyspath=*))");
-                ldapProperties.AddRange(new[] {"gpcfilesyspath", "displayname"});
+                //ldapFilterParts.Add("(&(objectCategory=groupPolicyContainer)(name=*)(gpcfilesyspath=*))");
+                //ldapProperties.AddRange(new[] {"gpcfilesyspath", "displayname"});
+                ldapFilterParts.Add("(&(objectcategory=organizationalUnit)(gplink=*))");
+                ldapProperties.AddRange(new []{"gplink"});
             }
 
             if (methods.HasFlag(CollectionMethodResolved.SPNTargets))
