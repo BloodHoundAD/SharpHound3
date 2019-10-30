@@ -38,7 +38,7 @@ namespace SharpHound3.Tasks
                     var splitLink = link.Split(';');
                     var distinguishedName = splitLink[0];
                     distinguishedName =
-                        distinguishedName.Substring(distinguishedName.IndexOf("CN=", StringComparison.OrdinalIgnoreCase), distinguishedName.Length);
+                        distinguishedName.Substring(distinguishedName.IndexOf("CN=", StringComparison.OrdinalIgnoreCase));
 
                     var status = splitLink[1];
 
@@ -149,7 +149,7 @@ namespace SharpHound3.Tasks
                     var splitLink = link.Split(';');
                     var distinguishedName = splitLink[0];
                     distinguishedName =
-                        distinguishedName.Substring(distinguishedName.IndexOf("CN=", StringComparison.OrdinalIgnoreCase), distinguishedName.Length);
+                        distinguishedName.Substring(distinguishedName.IndexOf("CN=", StringComparison.OrdinalIgnoreCase));
                     var status = splitLink[1];
 
                     //Status 1 and status 3 correspond to disabled/unenforced and disabled/enforced, so filter them out

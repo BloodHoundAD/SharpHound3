@@ -93,7 +93,7 @@ namespace SharpHound3.Tasks
                 {
                     var sessionUsername = session.sesi10_username;
                     var computerName = session.sesi10_cname;
-                    
+
                     if (computerName == null)
                         continue;
 
