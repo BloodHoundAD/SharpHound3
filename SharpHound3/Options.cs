@@ -27,6 +27,9 @@ namespace SharpHound3
         public bool SearchForest { get; set; }
 
         //Output Options
+        [Option(HelpText = "Don't output data from this run. Used for debugging purposes", Hidden = true)]
+        public bool NoOutput { get; set; }
+
         [Option(HelpText = "Folder to output files too", Default = ".")]
         public string OutputDirectory { get; set; }
 
@@ -107,7 +110,7 @@ namespace SharpHound3
         [Option(HelpText = "Collect all LDAP properties from objects instead of a subset during ObjectProps", Default = false)]
         public bool CollectAllProperties { get; set; }
 
-        //Output Options
+        //Console Output Options
         [Option(HelpText = "Interval in which to display status in milliseconds", Default = 30000)]
         public int StatusInterval { get; set; }
 
