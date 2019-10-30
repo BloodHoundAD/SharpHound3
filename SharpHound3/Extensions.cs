@@ -20,92 +20,6 @@ namespace SharpHound3
             }
         }
 
-        #region DirectoryEntry
-
-        public static string GetSid(this DirectoryEntry directoryEntry)
-        {
-            if (!directoryEntry.Properties.Contains("objectsid"))
-                return null;
-
-            var sid = directoryEntry.Properties["objectsid"][0];
-
-            switch (sid)
-            {
-                case byte[] b:
-                    return new SecurityIdentifier(b, 0).Value;
-                case string st:
-                    return new SecurityIdentifier(Encoding.ASCII.GetBytes(st), 0).Value;
-            }
-
-            return null;
-        }
-
-        public static string GetProperty(this DirectoryEntry directoryEntry, string property)
-        {
-            if (!directoryEntry.Properties.Contains(property))
-                return null;
-
-            return directoryEntry.Properties[property][0].ToString();
-        }
-
-        public static LdapTypeEnum GetLdapType(this DirectoryEntry directoryEntry)
-        {
-            var objectSid = directoryEntry.GetSid();
-            if (CommonPrincipal.GetCommonSid(objectSid, out var commonPrincipal))
-            {
-                return commonPrincipal.Type;
-            }
-
-            var objectType = LdapTypeEnum.Unknown;
-            var samAccountType = directoryEntry.GetProperty("samaccounttype");
-
-            if (samAccountType != null)
-            {
-                if (samAccountType == "805306370")
-                    return LdapTypeEnum.Unknown;
-
-                objectType = Helpers.SamAccountTypeToType(samAccountType);
-            }
-            else
-            {
-                var objectClasses = directoryEntry.GetPropertyAsArray("objectClass");
-                if (objectClasses == null)
-                {
-                    objectType = LdapTypeEnum.Unknown;
-                }
-                else if (objectClasses.Contains("groupPolicyContainer"))
-                {
-                    objectType = LdapTypeEnum.GPO;
-                }
-                else if (objectClasses.Contains("organizationalUnit"))
-                {
-                    objectType = LdapTypeEnum.OU;
-                }
-                else if (objectClasses.Contains("domain"))
-                {
-                    objectType = LdapTypeEnum.Domain;
-                }
-            }
-
-            return objectType;
-        }
-
-        public static string[] GetPropertyAsArray(this DirectoryEntry directoryEntry, string property)
-        {
-            if (!directoryEntry.Properties.Contains(property))
-                return new string[0];
-
-            var values = directoryEntry.Properties[property];
-
-            var propArray = new string[values.Count];
-
-            for (var i = 0; i < values.Count; i++)
-                propArray[i] = values[i].ToString();
-
-            return propArray;
-        }
-
-        #endregion
 
         #region SearchResultEntry
         public static string GetProperty(this SearchResultEntry searchResultEntry, string property)
@@ -113,7 +27,15 @@ namespace SharpHound3
             if (!searchResultEntry.Attributes.Contains(property))
                 return null;
 
-            return searchResultEntry.Attributes[property][0].ToString();
+            var collection = searchResultEntry.Attributes[property];
+            var lookups = collection.GetValues(typeof(string));
+            if (lookups.Length == 0)
+                return null;
+
+            if (!(lookups[0] is string prop) || prop.Length == 0)
+                return null;
+
+            return prop;
         }
 
         public static string GetSid(this SearchResultEntry searchResultEntry)
@@ -121,17 +43,14 @@ namespace SharpHound3
             if (!searchResultEntry.Attributes.Contains("objectsid"))
                 return null;
 
-            //objectsid can sometimes be either a string or a byte array. Just AD things
-            var s = searchResultEntry.Attributes["objectsid"][0];
-            switch (s)
-            {
-                case byte[] b:
-                    return new SecurityIdentifier(b, 0).Value;
-                case string st:
-                    return new SecurityIdentifier(Encoding.ASCII.GetBytes(st), 0).Value;
-            }
+            var s = searchResultEntry.Attributes["objectsid"].GetValues(typeof(byte[]));
+            if (s.Length == 0)
+                return null;
 
-            return null;
+            if (!(s[0] is byte[] sidBytes) || sidBytes.Length == 0)
+                return null;
+
+            return new SecurityIdentifier(sidBytes, 0).Value;
         }
 
         public static string[] GetPropertyAsArray(this SearchResultEntry searchResultEntry, string property)
@@ -140,20 +59,28 @@ namespace SharpHound3
                 return new string[0];
 
             var values = searchResultEntry.Attributes[property];
+            var strings = values.GetValues(typeof(string));
 
-            var propArray = new string[values.Count];
+            if (!(strings is string[] result))
+                return null;
 
-            for (var i = 0; i < values.Count; i++)
-                propArray[i] = values[i].ToString();
-
-            return propArray;
+            return result;
         }
 
         public static byte[] GetPropertyAsBytes(this SearchResultEntry searchResultEntry, string property)
         {
             if (!searchResultEntry.Attributes.Contains(property))
                 return null;
-            return searchResultEntry.Attributes[property][0] as byte[];
+
+            var collection = searchResultEntry.Attributes[property];
+            var lookups = collection.GetValues(typeof(byte[]));
+            if (lookups.Length == 0)
+                return null;
+
+            if (!(lookups[0] is byte[] bytes) || bytes.Length == 0)
+                return null;
+
+            return bytes;
         }
 
         public static string GetObjectIdentifier(this SearchResultEntry searchResultEntry)
