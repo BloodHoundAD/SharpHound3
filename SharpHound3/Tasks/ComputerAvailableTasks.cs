@@ -21,7 +21,7 @@ namespace SharpHound3.Tasks
                     {
                         ComputerName = computer.DisplayName,
                         Status = "SMBNotAvailable",
-                        Task = "Ping"
+                        Task = "SMBCheck"
                     });
                 }
             }
