@@ -7,7 +7,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
-using System.Threading;
+using System.Timers;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using SharpHound3.Enums;
@@ -22,22 +22,12 @@ namespace SharpHound3.Tasks
         private static readonly Cache AppCache = Cache.Instance;
         //These are the properties required to do the appropriate lookups for group membership translations
         internal static readonly string[] LookupProps = { "samaccounttype", "objectsid", "objectclass" };
-        private static int _fspCount = 0;
 
         internal static async Task<LdapWrapper> ProcessGroupMembership(LdapWrapper wrapper)
         {
             if (wrapper is Group group)
             {
-                var watch = new Stopwatch();
-                watch.Start();
                 await GetGroupMembership(group);
-                if (watch.ElapsedMilliseconds > 10000)
-                {
-                    Console.WriteLine(
-                        $"{wrapper.DisplayName} took {watch.Elapsed} with {group.Members.Length} members");
-                }
-
-                watch.Stop();
             }
             else if (wrapper is Computer || wrapper is User)
             {
@@ -81,6 +71,8 @@ namespace SharpHound3.Tasks
             //If we get 0 back for member length, its either a ranged retrieval issue, or its an empty group.
             if (groupMembers.Length == 0)
             {
+                Timer timer = null;
+                var count = 0;
                 //Lets try ranged retrieval here
                 var searcher = Helpers.GetDirectorySearcher(group.Domain);
                 var range = await searcher.RangedRetrievalAsync(group.DistinguishedName, "member");
@@ -91,10 +83,25 @@ namespace SharpHound3.Tasks
                     return;
                 }
 
+                if (range.Count > 1000 && Options.Instance.Verbose)
+                {
+                    timer = new Timer(30000);
+                    timer.Elapsed += (sender, args) =>
+                    {
+                        Console.WriteLine($"Group Enumeration - {group.DisplayName} {count} / {range.Count}");
+                    };
+                    timer.AutoReset = true;
+                    timer.Start();
+                }
+
                 foreach (var groupMemberDistinguishedName in range)
                 {
                     finalMembers.Add(await TranslateDistinguishedName(groupMemberDistinguishedName));
+                    count++;
                 }
+
+                timer?.Stop();
+                timer?.Dispose();
             }
             else
             {
@@ -124,9 +131,7 @@ namespace SharpHound3.Tasks
                     MemberId = resolved.ObjectIdentifier
                 };
             }
-
             var member = await TranslateDistinguishedNameWithLdap(distinguishedName);
-
             //Add our new member to the cache for future lookups
             AppCache.Add(distinguishedName, new ResolvedPrincipal
             {
@@ -151,9 +156,6 @@ namespace SharpHound3.Tasks
 
             if (distinguishedName.Contains("ForeignSecurityPrincipals"))
             {
-                Interlocked.Increment(ref _fspCount);
-                Console.WriteLine($"FSP:{_fspCount}");
-
                 //If this is an FSP, we extract the SID from the "distinguishedname"
                 var sid = distinguishedName.Split(',')[0].Substring(3);
                 if (distinguishedName.Contains("CN=S-1-5-21"))
@@ -215,6 +217,5 @@ namespace SharpHound3.Tasks
                 MemberType = type
             };
         }
-
     }
 }
