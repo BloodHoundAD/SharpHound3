@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using SharpHound3.Enums;
+﻿using SharpHound3.Enums;
 
 namespace SharpHound3.JSON
 {

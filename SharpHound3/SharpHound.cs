@@ -1,26 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.DirectoryServices.Protocols;
-using System.Linq;
 using System.Security.Principal;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using CommandLine;
-using Heijden.DNS;
 using SharpHound3.Enums;
 using SharpHound3.LdapWrappers;
 using SharpHound3.Tasks;
 
 namespace SharpHound3
 {
-    class SharpHound
+    internal class SharpHound
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
-
-            //TODO: GPOLocalGroup, Trusts
+            //TODO: Trusts
             var parser = new Parser(with =>
             {
                 with.CaseInsensitiveEnumValues = true;
@@ -59,8 +54,11 @@ namespace SharpHound3
 
             //We always need the producer
             var ldapVars = LdapBuilder.BuildLdapQuery();
-            var producer = new LdapProducer(null, ldapVars.LdapFilter, ldapVars.LdapProperties);
+            var cancellationTokenSource = new CancellationTokenSource();
+            var producer = new LdapProducer(null, ldapVars.LdapFilter, ldapVars.LdapProperties, cancellationTokenSource.Token);
             Task compErrorTask = null;
+
+            
             if (Options.Instance.DumpComputerStatus)
             {
                 compErrorTask = OutputTasks.StartComputerStatusTask();
@@ -70,7 +68,7 @@ namespace SharpHound3
             {
                 PropagateCompletion = true
             };
-
+            
             var executionOptions = new ExecutionDataflowBlockOptions
             {
                 EnsureOrdered = false,
@@ -80,7 +78,13 @@ namespace SharpHound3
             var firstLinked = false;
 
             //FindType is always the first block
-            var findTypeBlock = new TransformBlock<SearchResultEntry, LdapWrapper>(ResolveTypeTask.FindLdapType, executionOptions);
+            var findTypeBlock = new TransformBlock<SearchResultEntry, LdapWrapper>(ResolveTypeTask.FindLdapType, new ExecutionDataflowBlockOptions
+            {
+                EnsureOrdered = false,
+                MaxDegreeOfParallelism = 10,
+                BoundedCapacity = 500,
+                CancellationToken = cancellationTokenSource.Token
+            });
 
             findTypeBlock.LinkTo(DataflowBlock.NullTarget<LdapWrapper>(), (item) => item == null);
 
@@ -258,7 +262,7 @@ namespace SharpHound3
             outputBlock.Completion.Wait();
             CleanupTasks();
             compErrorTask?.Wait();
-            
+            cancellationTokenSource.Dispose();
         }
 
         internal static void CleanupTasks()
