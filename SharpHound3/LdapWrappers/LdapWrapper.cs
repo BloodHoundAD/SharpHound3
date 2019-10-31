@@ -29,8 +29,7 @@ namespace SharpHound3.LdapWrappers
             set => _domain = value.ToUpper();
         }
         [JsonIgnore]
-        public SearchResultEntry SearchResult { get; }
-
+        internal SearchResultEntry SearchResult { get; }
         public override string ToString()
         {
             return $"{DisplayName}";
