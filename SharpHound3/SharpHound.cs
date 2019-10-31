@@ -50,10 +50,11 @@ namespace SharpHound3
                 return;
             }
 
-            OutputTasks.StartOutputTimer();
+            
             OutputTasks.StartComputerStatusTask();
 
             var pipeline = PipelineBuilder.GetBasePipelineForDomain(Options.Instance.Domain);
+            OutputTasks.StartOutputTimer();
             await pipeline;
 
             

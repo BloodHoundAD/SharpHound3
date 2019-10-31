@@ -91,6 +91,8 @@
     <Compile Include="LdapWrappers\Group.cs" />
     <Compile Include="LdapWrappers\OU.cs" />
     <Compile Include="LdapWrappers\User.cs" />
+    <Compile Include="Producers\BaseProducer.cs" />
+    <Compile Include="Producers\StealthProducer.cs" />
     <Compile Include="SharpHound.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="DirectorySearch.cs" />
@@ -104,7 +106,7 @@
     <Compile Include="Tasks\OutputTasks.cs" />
     <Compile Include="Tasks\PipelineBuilder.cs" />
     <Compile Include="Tasks\ResolveTypeTask.cs" />
-    <Compile Include="Tasks\LdapProducer.cs" />
+    <Compile Include="Producers\LdapProducer.cs" />
     <Compile Include="Tasks\ObjectPropertyTasks.cs" />
     <Compile Include="Tasks\ACLTasks.cs" />
     <Compile Include="Tasks\NetSessionTasks.cs" />
