@@ -82,11 +82,6 @@ namespace SharpHound3
             var finalFilter = string.Join("", ldapFilterParts.ToArray());
             finalFilter = ldapFilterParts.Count == 1 ? ldapFilterParts[0] : $"(|{finalFilter})";
 
-            if (Options.Instance.ExcludeDomainControllers)
-            {
-                finalFilter = $"(&({finalFilter})(!(userAccountControl:1.2.840.113556.1.4.803:=8192)))";
-            }
-
             var userFilter = Options.Instance.LdapFilter;
             if (userFilter != null)
             {
