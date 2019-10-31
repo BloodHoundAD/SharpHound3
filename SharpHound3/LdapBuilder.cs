@@ -76,7 +76,11 @@ namespace SharpHound3
 
             if (methods.HasFlag(CollectionMethodResolved.SPNTargets))
             {
-
+                ldapFilterParts.Add("(&(samaccounttype=805306368)(serviceprincipalname=*))");
+                ldapProperties.AddRange(new[]
+                {
+                    "serviceprincipalname"
+                });
             }
 
             var finalFilter = string.Join("", ldapFilterParts.ToArray());
