@@ -121,7 +121,6 @@ namespace SharpHound3
 
             if (HostResolutionMap.TryGetValue(newHostname, out var resolvedHost)) return resolvedHost;
 
-
             string computerName;
             string computerDomain = null;
             if (!IPAddress.TryParse(newHostname, out _))
@@ -149,7 +148,7 @@ namespace SharpHound3
             }
 
             //Call NetWkstaGetInfo and see if we can get the info from there.
-            if (PingHost(newHostname, 445) && CallNetWkstaGetInfo(newHostname, out var workstationInfo))
+            if (CheckPort(newHostname, 445) && CallNetWkstaGetInfo(newHostname, out var workstationInfo))
             {
                 computerDomain = workstationInfo.lan_group;
                 computerName = workstationInfo.computer_name;
@@ -259,12 +258,19 @@ namespace SharpHound3
                         IPAddress address;
                         if (server.Contains("."))
                         {
-                            address = Dns.GetHostAddresses(server)[0];
+                            address = Dns
+                                .GetHostAddresses(server).First(x => x.AddressFamily == AddressFamily.InterNetwork);
                         }
                         else
                         {
                             var domainName = Options.Instance.RealDNSName ?? domain ?? NormalizeDomainName(null);
                             address = Dns.GetHostAddresses($"{server}.{domainName}")[0];
+                        }
+
+                        if (address == null)
+                        {
+                            netbios = null;
+                            return false;
                         }
 
                         remoteEndpoint = new IPEndPoint(address, 137);
@@ -279,10 +285,10 @@ namespace SharpHound3
 
                 var originEndpoint = new IPEndPoint(IPAddress.Any, 0);
                 requestSocket.Bind(originEndpoint);
-                requestSocket.SendTo(NameRequest, remoteEndpoint);
-
+                
                 try
                 {
+                    requestSocket.SendTo(NameRequest, remoteEndpoint);
                     var receivedByteCount = requestSocket.ReceiveFrom(receiveBuffer, ref remoteEndpoint);
                     if (receivedByteCount >= 90)
                     {
@@ -549,7 +555,7 @@ namespace SharpHound3
             await Task.Delay(delay);
         }
 
-        internal static bool PingHost(string hostname, int port)
+        internal static bool CheckPort(string hostname, int port)
         {
             if (Options.Instance.SkipPortScan)
                 return true;
@@ -609,9 +615,8 @@ namespace SharpHound3
                 DomainObjectMap.TryAdd(key, domainObj);
                 return domainObj;
             }
-            catch (Exception e)
+            catch
             {
-                Console.WriteLine(e);
                 DomainObjectMap.TryAdd(key, null);
                 return domainObj;
             }
