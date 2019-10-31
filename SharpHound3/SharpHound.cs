@@ -54,7 +54,6 @@ namespace SharpHound3
             OutputTasks.StartComputerStatusTask();
 
             var pipeline = PipelineBuilder.GetBasePipelineForDomain(Options.Instance.Domain);
-            OutputTasks.StartOutputTimer();
             await pipeline;
 
             

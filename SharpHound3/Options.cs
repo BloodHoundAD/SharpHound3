@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using CommandLine;
 using SharpHound3.Enums;
+using SharpHound3.LdapWrappers;
 
 namespace SharpHound3
 {
@@ -214,6 +215,64 @@ namespace SharpHound3
                 }
             }
 
+            
+            if (Stealth)
+            {
+                var updates = new List<string>();
+                if ((resolved & CollectionMethodResolved.LoggedOn) != 0)
+                {
+                    resolved ^= CollectionMethodResolved.LoggedOn;
+                    updates.Add("[-] Removed LoggedOn Collection");
+                }
+
+                var localGroupRemoved = false;
+                if ((resolved & CollectionMethodResolved.RDP) != 0)
+                {
+                    localGroupRemoved = true;
+                    resolved ^= CollectionMethodResolved.RDP;
+                    updates.Add("[-] Removed RDP Collection");
+                }
+
+                if ((resolved & CollectionMethodResolved.DCOM) != 0)
+                {
+                    localGroupRemoved = true;
+                    resolved ^= CollectionMethodResolved.DCOM;
+                    updates.Add("[-] Removed DCOM Collection");
+                }
+
+                if ((resolved & CollectionMethodResolved.PSRemote) != 0)
+                {
+                    localGroupRemoved = true;
+                    resolved ^= CollectionMethodResolved.PSRemote;
+                    updates.Add("[-] Removed PSRemote Collection");
+                }
+
+                if ((resolved & CollectionMethodResolved.LocalAdmin) != 0)
+                {
+                    localGroupRemoved = true;
+                    resolved ^= CollectionMethodResolved.LocalAdmin;
+                    updates.Add("[-] Removed LocalAdmin Collection");
+                }
+
+                if (localGroupRemoved)
+                {
+                    resolved |= CollectionMethodResolved.GPOLocalGroup;
+                    updates.Add("[+] Added GPOLocalGroup");
+                }
+
+                if (updates.Count > 0)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Updated Collection Methods to Reflect Stealth Options");
+                    foreach (var update in updates)
+                    {
+                        Console.WriteLine(update);
+                    }
+                }
+            }
+            Console.WriteLine();
+            Console.WriteLine($"Resolved Collection Methods: {resolved}");
+            Console.WriteLine();
             ResolvedCollectionMethods = resolved;
 
             return true;

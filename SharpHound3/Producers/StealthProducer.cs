@@ -23,7 +23,7 @@ namespace SharpHound3.Producers
             var targetSids = await FindPathTargetSids();
             ResolveTypeTask.SetStealthTargetSids(targetSids);
             var token = Helpers.GetCancellationToken();
-
+            OutputTasks.StartOutputTimer();
             foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree))
             {
                 if (token.IsCancellationRequested)

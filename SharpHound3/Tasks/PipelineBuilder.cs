@@ -18,7 +18,6 @@ namespace SharpHound3.Tasks
         {
             var options = Options.Instance;
             var resolvedMethods = options.ResolvedCollectionMethods;
-            Console.WriteLine($"Resolved Collection Methods: {resolvedMethods}");
             var ldapVariables = LdapBuilder.BuildLdapQuery(resolvedMethods);
             BaseProducer producer;
             if (Options.Instance.Stealth)

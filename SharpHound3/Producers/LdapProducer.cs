@@ -1,6 +1,7 @@
 ﻿using System.DirectoryServices.Protocols;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using SharpHound3.Tasks;
 
 namespace SharpHound3.Producers
 {
@@ -13,6 +14,7 @@ namespace SharpHound3.Producers
         protected override async Task ProduceLdap(ITargetBlock<SearchResultEntry> queue)
         {
             var token = Helpers.GetCancellationToken();
+            OutputTasks.StartOutputTimer();
             foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree))
             {
                 if (token.IsCancellationRequested)
