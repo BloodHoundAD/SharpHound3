@@ -254,9 +254,10 @@ namespace SharpHound3.Tasks
                     }
                 }
 
-                if (affectsComputers)
+                if (affectsComputers && domain.Computers.Length == 0)
                     domain.Computers = affectedComputers.ToArray();
             }
+
             if (target is OU ou)
             {
                 foreach (var x in data)
@@ -299,7 +300,7 @@ namespace SharpHound3.Tasks
                     }
                 }
 
-                if (affectsComputers)
+                if (affectsComputers && ou.Computers.Length == 0)
                     ou.Computers = affectedComputers.ToArray();
             }
         }
