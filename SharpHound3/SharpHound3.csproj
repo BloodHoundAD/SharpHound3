@@ -110,6 +110,7 @@
     <Compile Include="Tasks\ObjectPropertyTasks.cs" />
     <Compile Include="Tasks\ACLTasks.cs" />
     <Compile Include="Tasks\NetSessionTasks.cs" />
+    <Compile Include="Tasks\SPNTasks.cs" />
     <Compile Include="Tasks\TrustTasks.cs" />
   </ItemGroup>
   <ItemGroup>

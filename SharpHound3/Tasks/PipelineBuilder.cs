@@ -94,6 +94,18 @@ namespace SharpHound3.Tasks
                 blocks.Add(block);
             }
 
+            if ((resolvedMethods & CollectionMethodResolved.SPNTargets) != 0)
+            {
+                //block = new TransformBlock<LdapWrapper, LdapWrapper>(SPNTasks.ProcessSPNS, new ExecutionDataflowBlockOptions
+                //{
+                //    MaxDegreeOfParallelism = 1,
+                //    EnsureOrdered = false,
+                //    BoundedCapacity = 500
+                //});
+                block = new TransformBlock<LdapWrapper, LdapWrapper>(SPNTasks.ProcessSPNS, executionOptions);
+                blocks.Add(block);
+            }
+
             //Start computer block
 
             //Only add this block if theres actually computer collection happening AND we're not skipping ping
