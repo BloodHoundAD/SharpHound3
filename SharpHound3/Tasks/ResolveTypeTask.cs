@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.DirectoryServices.Protocols;
 using System.Linq;
+using System.Security.Policy;
 using SharpHound3.Enums;
 using SharpHound3.LdapWrappers;
 
@@ -8,6 +10,31 @@ namespace SharpHound3.Tasks
 {
     internal static class ResolveTypeTask
     {
+        private static HashSet<string> _stealthTargetSids;
+        private static HashSet<string> _domainControllerSids;
+
+        internal static void SetStealthTargetSids(HashSet<string> targets)
+        {
+            if (_stealthTargetSids == null)
+                _stealthTargetSids = targets;
+            else
+            {
+                _stealthTargetSids.UnionWith(targets);
+            }
+        }
+
+        internal static void SetDomainControllerSids(HashSet<string> dcs)
+        {
+            if (_domainControllerSids == null)
+            {
+                _domainControllerSids = dcs;
+            }
+            else
+            {
+                _domainControllerSids.UnionWith(dcs);
+            }
+        }
+
         internal static LdapWrapper CreateLdapWrapper(SearchResultEntry searchResultEntry)
         {
             //Look for a null DN first. Not sure why this would happen.
@@ -144,7 +171,7 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("domain", wrapper.Domain);
             wrapper.Properties.Add("objectid", objectIdentifier);
             wrapper.ObjectIdentifier = objectIdentifier;
-
+            PostProcessWrapper(wrapper);
             Cache.Instance.Add(wrapper.DistinguishedName, new ResolvedPrincipal
             {
                 ObjectIdentifier = wrapper.ObjectIdentifier,
@@ -158,6 +185,24 @@ namespace SharpHound3.Tasks
 
             //Return our wrapper for the next step in the pipeline
             return wrapper;
+        }
+
+        private static void PostProcessWrapper(LdapWrapper wrapper)
+        {
+            var opts = Options.Instance;
+
+            if (wrapper is Computer computer)
+            {
+                if (opts.Stealth && _stealthTargetSids.Contains(computer.ObjectIdentifier))
+                {
+                    computer.IsStealthTarget = true;
+                }
+
+                if (opts.ExcludeDomainControllers && _domainControllerSids.Contains(computer.ObjectIdentifier))
+                {
+                    computer.IsDomainController = true;
+                }
+            }
         }
     }
 }

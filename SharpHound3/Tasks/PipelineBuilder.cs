@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.DirectoryServices.Protocols;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using SharpHound3.Enums;
 using SharpHound3.LdapWrappers;
+using SharpHound3.Producers;
 
 namespace SharpHound3.Tasks
 {
@@ -16,8 +18,18 @@ namespace SharpHound3.Tasks
         {
             var options = Options.Instance;
             var resolvedMethods = options.ResolvedCollectionMethods;
+            Console.WriteLine($"Resolved Collection Methods: {resolvedMethods}");
             var ldapVariables = LdapBuilder.BuildLdapQuery(resolvedMethods);
-            var producer = new LdapProducer(domain, ldapVariables.LdapFilter, ldapVariables.LdapProperties);
+            BaseProducer producer;
+            if (Options.Instance.Stealth)
+            {
+                producer = new StealthProducer(domain, ldapVariables.LdapFilter, ldapVariables.LdapProperties);
+            }
+            else
+            {
+                producer = new LdapProducer(domain, ldapVariables.LdapFilter, ldapVariables.LdapProperties);
+            }  
+
             var linkOptions = new DataflowLinkOptions
             {
                 PropagateCompletion = true
@@ -158,6 +170,14 @@ namespace SharpHound3.Tasks
             block.LinkTo(outputBlock, linkOptions);
             producer.StartProducer(findTypeBlock);
             return outputBlock.Completion;
+        }
+
+        internal static Task BuildLoopPipeline(string domainName)
+        {
+            var options = Options.Instance;
+            var resolvedMethods = options.ResolvedCollectionMethods;
+
+            return Task.Delay(100);
         }
     }
 }

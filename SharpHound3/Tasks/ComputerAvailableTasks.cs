@@ -10,6 +10,8 @@ namespace SharpHound3.Tasks
         {
             if (wrapper is Computer computer)
             {
+                if (Options.Instance.Stealth && !computer.IsStealthTarget)
+                    return wrapper;
                 computer.PingFailed = Helpers.PingHost(computer.APIName, 445) == false;
                 if (computer.PingFailed && Options.Instance.DumpComputerStatus)
                 {

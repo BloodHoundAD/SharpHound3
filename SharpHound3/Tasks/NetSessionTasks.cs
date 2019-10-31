@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -15,6 +16,16 @@ namespace SharpHound3.Tasks
         {
             if (wrapper is Computer computer && !computer.PingFailed)
             {
+                //If ExcludeDC is set remove DCs from collection
+                if (Options.Instance.ExcludeDomainControllers && computer.IsDomainController)
+                {
+                    return wrapper;
+                }
+
+                //If stealth is set, only do session enum if the computer is marked as a stealth target
+                if (Options.Instance.Stealth && !computer.IsStealthTarget)
+                    return wrapper;
+
                 var sessions = await GetNetSessions(computer);
                 var temp = computer.Sessions.ToList();
                 temp.AddRange(sessions);
