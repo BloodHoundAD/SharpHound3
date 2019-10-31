@@ -16,6 +16,8 @@ namespace SharpHound3.LdapWrappers
             RemoteDesktopUsers = new GenericMember[0];
             DcomUsers = new GenericMember[0];
             PSRemoteUsers= new GenericMember[0];
+            IsStealthTarget = false;
+            IsDomainController = false;
         }
 
         [JsonIgnore]
@@ -38,7 +40,13 @@ namespace SharpHound3.LdapWrappers
         public GenericMember[] PSRemoteUsers { get; set; }
 
         [JsonIgnore]
-        public bool PingFailed { get; set; }
+        internal bool PingFailed { get; set; }
+
+        [JsonIgnore]
+        internal bool IsStealthTarget { get; set; }
+
+        [JsonIgnore]
+        internal bool IsDomainController { get; set; }
 
         [JsonIgnore]
         public string APIName
