@@ -56,22 +56,22 @@ namespace SharpHound3
                     "sidhistory", "useraccountcontrol", "operatingsystem",
                     "operatingsystemservicepack", "serviceprincipalname", "displayname", "mail", "title",
                     "homedirectory","description","admincount","userpassword","gpcfilesyspath","objectclass",
-                    "msds-behavior-version","objectguid", "name", "gpoptions", "msds-allowedToDelegateTo", "msDS-AllowedToActOnBehalfOfOtherIdentity"
+                    "msds-behavior-version","objectguid", "name", "gpoptions", "msds-allowedToDelegateTo", "msDS-AllowedToActOnBehalfOfOtherIdentity", "displayname"
                 });
             }
 
             if (methods.HasFlag(CollectionMethodResolved.Container))
             {
                 ldapFilterParts.Add("(|(&(objectCategory=groupPolicyContainer)(name=*)(gpcfilesyspath=*))(objectcategory=organizationalUnit)(objectClass=domain))");
-                ldapProperties.AddRange(new[] {"gplink", "gpoptions", "displayname"});
+                ldapProperties.AddRange(new[] {"gplink", "gpoptions", "name", "displayname"});
             }
 
             if (methods.HasFlag(CollectionMethodResolved.GPOLocalGroup))
             {
                 //ldapFilterParts.Add("(&(objectCategory=groupPolicyContainer)(name=*)(gpcfilesyspath=*))");
                 //ldapProperties.AddRange(new[] {"gpcfilesyspath", "displayname"});
-                ldapFilterParts.Add("(&(objectcategory=organizationalUnit)(gplink=*))");
-                ldapProperties.AddRange(new []{"gplink"});
+                ldapFilterParts.Add("(&(|(objectcategory=organizationalUnit)(objectclass=domain))(gplink=*))");
+                ldapProperties.AddRange(new []{"gplink", "name" });
             }
 
             if (methods.HasFlag(CollectionMethodResolved.SPNTargets))
