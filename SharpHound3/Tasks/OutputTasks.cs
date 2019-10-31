@@ -86,6 +86,13 @@ namespace SharpHound3.Tasks
         {
             PrintStatus();
             Console.WriteLine($"Enumeration finished in {_runTimer.Elapsed}");
+
+            if (Options.Instance.DumpComputerStatus)
+            {
+                CompleteComputerStatusOutput();
+                await _computerStatusTask;
+            }
+
             _runTimer.Stop();
             _statusTimer.Stop();
             if (UserOutput.IsValueCreated)
@@ -164,11 +171,7 @@ namespace SharpHound3.Tasks
 
             Console.WriteLine("Finished compressing files. Happy graphing!");
 
-            if (Options.Instance.DumpComputerStatus)
-            {
-                CompleteComputerStatusOutput();
-                await _computerStatusTask;
-            }
+            
         }
 
         private static string GenerateZipPassword()
@@ -194,6 +197,7 @@ namespace SharpHound3.Tasks
             _computerStatusTask = Task.Factory.StartNew(() =>
             {
                 var fileName = Helpers.ResolveFileName("computerstatus", "csv", true);
+                UsedFileNames.Add(fileName);
                 var count = 0;
                 using (var writer = new StreamWriter(fileName, false))
                 {
