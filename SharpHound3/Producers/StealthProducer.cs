@@ -19,7 +19,8 @@ namespace SharpHound3.Producers
 
         protected override async Task ProduceLdap(ITargetBlock<SearchResultEntry> queue)
         {
-            Console.WriteLine("[+] Resolving Stealth Targets from LDAP Properties");
+            Console.WriteLine("[+] Finding Stealth Targets from LDAP Properties");
+            Console.WriteLine();
             var targetSids = await FindPathTargetSids();
             ResolveTypeTask.SetStealthTargetSids(targetSids);
             var token = Helpers.GetCancellationToken();

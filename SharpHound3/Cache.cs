@@ -77,7 +77,8 @@ namespace SharpHound3
                 _globalCatalogDictionary = new ConcurrentDictionary<string, string[]>();
                 _resolvedPrincipalDictionary = new ConcurrentDictionary<string, ResolvedPrincipal>();
                 _sidTypeDictionary = new ConcurrentDictionary<string, LdapTypeEnum>();
-                Console.WriteLine("Cache Invalidated: 0 Objects in Cache");
+                Console.WriteLine("[-] Cache Invalidated: 0 Objects in Cache");
+                Console.WriteLine();
                 return;
             }
 
@@ -88,7 +89,8 @@ namespace SharpHound3
                 _globalCatalogDictionary = new ConcurrentDictionary<string, string[]>();
                 _resolvedPrincipalDictionary = new ConcurrentDictionary<string, ResolvedPrincipal>();
                 _sidTypeDictionary = new ConcurrentDictionary<string, LdapTypeEnum>();
-                Console.WriteLine("Cache File not Found: 0 Objects in cache");
+                Console.WriteLine("[+] Cache File not Found: 0 Objects in cache");
+                Console.WriteLine();
                 return;
             }
 
@@ -98,7 +100,8 @@ namespace SharpHound3
                 var bytes = File.ReadAllBytes(fileName);
                 var json = new UTF8Encoding(true).GetString(bytes);
                 CacheInstance = JsonConvert.DeserializeObject<Cache>(json);
-                Console.WriteLine($"Cache File Found! Loaded {CacheInstance._resolvedPrincipalDictionary.Count + CacheInstance._globalCatalogDictionary.Count + CacheInstance._sidTypeDictionary.Count} Objects in cache");
+                Console.WriteLine($"[+] Cache File Found! Loaded {CacheInstance._resolvedPrincipalDictionary.Count + CacheInstance._globalCatalogDictionary.Count + CacheInstance._sidTypeDictionary.Count} Objects in cache");
+                Console.WriteLine();
             }
             finally
             {

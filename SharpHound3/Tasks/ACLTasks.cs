@@ -62,7 +62,6 @@ namespace SharpHound3.Tasks
                         AceType = ""
                     });
                 }
-                
             }
 
             foreach (ActiveDirectoryAccessRule ace in descriptor.GetAccessRules(true,
@@ -99,7 +98,6 @@ namespace SharpHound3.Tasks
                 var rights = ace.ActiveDirectoryRights;
                 var objectAceType = ace.ObjectType.ToString();
                 
-
                 if (rights.HasFlag(ActiveDirectoryRights.GenericAll))
                 {
                     if (objectAceType == AllGuid || objectAceType == "")

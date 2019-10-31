@@ -262,15 +262,15 @@ namespace SharpHound3
 
                 if (updates.Count > 0)
                 {
-                    Console.WriteLine();
                     Console.WriteLine("Updated Collection Methods to Reflect Stealth Options");
                     foreach (var update in updates)
                     {
                         Console.WriteLine(update);
                     }
+                    Console.WriteLine();
                 }
             }
-            Console.WriteLine();
+
             Console.WriteLine($"Resolved Collection Methods: {resolved}");
             Console.WriteLine();
             ResolvedCollectionMethods = resolved;

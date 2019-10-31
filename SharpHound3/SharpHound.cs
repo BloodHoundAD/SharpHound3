@@ -25,6 +25,14 @@ namespace SharpHound3
 
             parser.ParseArguments<Options>(args).WithParsed(o =>
             {
+                var currentTime = DateTime.Now;
+                var initString =
+                    $"Initializing SharpHound at {currentTime.ToShortTimeString()} on {currentTime.ToShortDateString()}";
+                Console.WriteLine(new string('-', initString.Length));
+                Console.WriteLine(initString);
+                Console.WriteLine(new string('-', initString.Length));
+                Console.WriteLine();
+
                 if (o.OverrideUserName != null)
                 {
                     o.CurrentUserName = o.OverrideUserName;
@@ -50,7 +58,6 @@ namespace SharpHound3
                 return;
             }
 
-            
             OutputTasks.StartComputerStatusTask();
 
             var pipeline = PipelineBuilder.GetBasePipelineForDomain(Options.Instance.Domain);
