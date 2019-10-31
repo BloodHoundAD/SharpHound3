@@ -43,7 +43,6 @@ namespace SharpHound3
                 }
 
                 Options.Instance = o;
-                Cache.CreateInstance();
             }).WithNotParsed(error => {
 
             });
@@ -57,6 +56,8 @@ namespace SharpHound3
             {
                 return;
             }
+
+            Cache.CreateInstance();
 
             OutputTasks.StartComputerStatusTask();
 

@@ -551,7 +551,7 @@ namespace SharpHound3
 
         internal static bool PingHost(string hostname, int port)
         {
-            if (Options.Instance.SkipPing)
+            if (Options.Instance.SkipPortScan)
                 return true;
 
             var key = $"{hostname}-{port}".ToUpper();
@@ -570,7 +570,7 @@ namespace SharpHound3
                 try
                 {
                     var result = client.BeginConnect(hostname, port, null, null);
-                    var success = result.AsyncWaitHandle.WaitOne(Options.Instance.PingTimeout);
+                    var success = result.AsyncWaitHandle.WaitOne(Options.Instance.PortScanTimeout);
                     if (!success) return false;
 
                     client.EndConnect(result);

@@ -17,7 +17,7 @@ namespace SharpHound3.LdapWrappers
 
         public string DisplayName { get; set; }
         public string ObjectIdentifier { get; set; }
-        public string DistinguishedName { get; set; }
+        [JsonIgnore] public string DistinguishedName { get; set; }
 
         public Dictionary<string, object> Properties = new Dictionary<string, object>();
 
@@ -28,8 +28,9 @@ namespace SharpHound3.LdapWrappers
             get => _domain ?? (_domain = Helpers.DistinguishedNameToDomain(DistinguishedName));
             set => _domain = value.ToUpper();
         }
-        [JsonIgnore]
-        internal SearchResultEntry SearchResult { get; }
+
+        [JsonIgnore] internal SearchResultEntry SearchResult { get; }
+
         public override string ToString()
         {
             return $"{DisplayName}";

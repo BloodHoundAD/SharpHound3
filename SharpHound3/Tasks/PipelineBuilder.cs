@@ -45,7 +45,7 @@ namespace SharpHound3.Tasks
             var blocks = new List<TransformBlock<LdapWrapper, LdapWrapper>>();
 
             //The first block will always convert searchresults to the wrapper object
-            var findTypeBlock = new TransformBlock<SearchResultEntry, LdapWrapper>(ResolveTypeTask.CreateLdapWrapper, new ExecutionDataflowBlockOptions
+            var findTypeBlock = new TransformBlock<SearchResultEntry, LdapWrapper>(ConvertToWrapperTasks.CreateLdapWrapper, new ExecutionDataflowBlockOptions
             {
                 EnsureOrdered = false,
                 MaxDegreeOfParallelism = 10,
@@ -97,7 +97,7 @@ namespace SharpHound3.Tasks
             //Start computer block
 
             //Only add this block if theres actually computer collection happening AND we're not skipping ping
-            if (options.SkipPing && options.IsComputerCollectionSet())
+            if (options.SkipPortScan && options.IsComputerCollectionSet())
             {
                 block = new TransformBlock<LdapWrapper, LdapWrapper>(ComputerAvailableTasks.CheckSMBOpen,
                     executionOptions);

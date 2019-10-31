@@ -82,10 +82,10 @@ namespace SharpHound3
 
         //Enumeration Options
         [Option(HelpText = "Skip SMB port checks when connecting to computers", Default = false)]
-        public bool SkipPing { get; set; }
+        public bool SkipPortScan { get; set; }
 
         [Option(HelpText="Timeout for SMB port check", Default = 2000)]
-        public int PingTimeout { get; set; }
+        public int PortScanTimeout { get; set; }
 
         [Option(HelpText = "Exclude domain controllers from enumeration (useful to avoid Microsoft ATP/ATA)", Default = false)]
         public bool ExcludeDomainControllers { get; set; }

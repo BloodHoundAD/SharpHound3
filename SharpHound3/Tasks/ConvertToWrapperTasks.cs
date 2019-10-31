@@ -8,7 +8,7 @@ using SharpHound3.LdapWrappers;
 
 namespace SharpHound3.Tasks
 {
-    internal static class ResolveTypeTask
+    internal static class ConvertToWrapperTasks
     {
         private static HashSet<string> _stealthTargetSids;
         private static HashSet<string> _domainControllerSids;
@@ -170,6 +170,7 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("name", wrapper.DisplayName);
             wrapper.Properties.Add("domain", wrapper.Domain);
             wrapper.Properties.Add("objectid", objectIdentifier);
+            wrapper.Properties.Add("distinguishedname", distinguishedName);
             wrapper.ObjectIdentifier = objectIdentifier;
             PostProcessWrapper(wrapper);
             Cache.Instance.Add(wrapper.DistinguishedName, new ResolvedPrincipal

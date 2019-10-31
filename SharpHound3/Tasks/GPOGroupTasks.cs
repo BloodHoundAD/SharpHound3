@@ -32,17 +32,17 @@ namespace SharpHound3.Tasks
 
         internal static async Task<LdapWrapper> ParseGPOLocalGroups(LdapWrapper wrapper)
         {
-            if (wrapper is OU ou)
+            if (wrapper is OU || wrapper is Domain)
             {
-                await ParseOUNew(ou);
+                await ParseLinkedObject(wrapper);
             }
 
             return wrapper;
         }
 
-        private static async Task ParseOUNew(OU ou)
+        private static async Task ParseLinkedObject(LdapWrapper target)
         {
-            var searchResultEntry = ou.SearchResult;
+            var searchResultEntry = target.SearchResult;
 
             var gpLinks = searchResultEntry.GetProperty("gplink");
 
@@ -51,16 +51,27 @@ namespace SharpHound3.Tasks
                 return;
 
             //First lets see if this group contains computers. If not, we'll ignore it
-            var searcher = Helpers.GetDirectorySearcher(ou.Domain);
+            var searcher = Helpers.GetDirectorySearcher(target.Domain);
             var affectedComputers = new List<string>();
-            foreach (var computerResult in searcher.QueryLdap("(samaccounttype=805306369)", new[] {"objectsid"},
-                SearchScope.Subtree, ou.DistinguishedName))
-            {
-                var sid = computerResult.GetSid();
-                if (sid == null)
-                    continue;
 
-                affectedComputers.Add(sid);
+            if (target is Domain testDomain && testDomain.Computers.Length > 0)
+            {
+                affectedComputers = new List<string>(testDomain.Computers);
+            }else if (target is OU testOu && testOu.Computers.Length > 0)
+            {
+                affectedComputers = new List<string>(testOu.Computers);
+            }
+            else
+            {
+                foreach (var computerResult in searcher.QueryLdap("(samaccounttype=805306369)", new[] { "objectsid" },
+                    SearchScope.Subtree, target.DistinguishedName))
+                {
+                    var sid = computerResult.GetSid();
+                    if (sid == null)
+                        continue;
+
+                    affectedComputers.Add(sid);
+                }
             }
 
             //If we have no computers, then theres no more processsing to do here.
@@ -199,41 +210,97 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            foreach (var x in data)
+            var affectsComputers = false;
+
+            if (target is Domain domain)
             {
-                var restrictedMember = x.Value.RestrictedMember;
-                var restrictedMemberOf = x.Value.RestrictedMemberOf;
-                var groupMember = x.Value.LocalGroups;
-                var finalMembers = new List<GenericMember>();
-                if (restrictedMember.Count > 0)
+                foreach (var x in data)
                 {
-                    finalMembers.AddRange(restrictedMember);
-                    finalMembers.AddRange(restrictedMemberOf);
-                }
-                else
-                {
-                    finalMembers.AddRange(restrictedMemberOf);
-                    finalMembers.AddRange(groupMember);
+                    var restrictedMember = x.Value.RestrictedMember;
+                    var restrictedMemberOf = x.Value.RestrictedMemberOf;
+                    var groupMember = x.Value.LocalGroups;
+                    var finalMembers = new List<GenericMember>();
+                    if (restrictedMember.Count > 0)
+                    {
+                        finalMembers.AddRange(restrictedMember);
+                        finalMembers.AddRange(restrictedMemberOf);
+                    }
+                    else
+                    {
+                        finalMembers.AddRange(restrictedMemberOf);
+                        finalMembers.AddRange(groupMember);
+                    }
+
+                    finalMembers = finalMembers.Distinct().ToList();
+                    if (finalMembers.Count > 0)
+                        affectsComputers = true;
+
+                    switch (x.Key)
+                    {
+                        case LocalGroupRids.Administrators:
+                            domain.LocalAdmins = finalMembers.ToArray();
+                            break;
+                        case LocalGroupRids.RemoteDesktopUsers:
+                            domain.RemoteDesktopUsers = finalMembers.ToArray();
+                            break;
+                        case LocalGroupRids.DcomUsers:
+                            domain.DcomUsers = finalMembers.ToArray();
+                            break;
+                        case LocalGroupRids.PSRemote:
+                            domain.PSRemoteUsers = finalMembers.ToArray();
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
                 }
 
-                finalMembers = finalMembers.Distinct().ToList();
-                switch (x.Key)
+                if (affectsComputers)
+                    domain.Computers = affectedComputers.ToArray();
+            }
+            if (target is OU ou)
+            {
+                foreach (var x in data)
                 {
-                    case LocalGroupRids.Administrators:
-                        ou.LocalAdmins = finalMembers.ToArray();
-                        break;
-                    case LocalGroupRids.RemoteDesktopUsers:
-                        ou.RemoteDesktopUsers = finalMembers.ToArray();
-                        break;
-                    case LocalGroupRids.DcomUsers:
-                        ou.DcomUsers = finalMembers.ToArray();
-                        break;
-                    case LocalGroupRids.PSRemote:
-                        ou.PSRemoteUsers = finalMembers.ToArray();
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
+                    var restrictedMember = x.Value.RestrictedMember;
+                    var restrictedMemberOf = x.Value.RestrictedMemberOf;
+                    var groupMember = x.Value.LocalGroups;
+                    var finalMembers = new List<GenericMember>();
+                    if (restrictedMember.Count > 0)
+                    {
+                        finalMembers.AddRange(restrictedMember);
+                        finalMembers.AddRange(restrictedMemberOf);
+                    }
+                    else
+                    {
+                        finalMembers.AddRange(restrictedMemberOf);
+                        finalMembers.AddRange(groupMember);
+                    }
+
+                    finalMembers = finalMembers.Distinct().ToList();
+                    if (finalMembers.Count > 0)
+                        affectsComputers = true;
+
+                    switch (x.Key)
+                    {
+                        case LocalGroupRids.Administrators:
+                            ou.LocalAdmins = finalMembers.ToArray();
+                            break;
+                        case LocalGroupRids.RemoteDesktopUsers:
+                            ou.RemoteDesktopUsers = finalMembers.ToArray();
+                            break;
+                        case LocalGroupRids.DcomUsers:
+                            ou.DcomUsers = finalMembers.ToArray();
+                            break;
+                        case LocalGroupRids.PSRemote:
+                            ou.PSRemoteUsers = finalMembers.ToArray();
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
                 }
+
+                if (affectsComputers)
+                    ou.Computers = affectedComputers.ToArray();
             }
         }
 

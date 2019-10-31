@@ -24,7 +24,7 @@ namespace SharpHound3.Producers
             DomainName = domainName;
             if (Options.Instance.ExcludeDomainControllers)
             {
-                ResolveTypeTask.SetDomainControllerSids(GetDomainControllerSids());
+                ConvertToWrapperTasks.SetDomainControllerSids(GetDomainControllerSids());
             }
         }
 

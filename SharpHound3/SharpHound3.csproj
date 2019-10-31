@@ -105,7 +105,7 @@
     <Compile Include="Tasks\LoggedOnTasks.cs" />
     <Compile Include="Tasks\OutputTasks.cs" />
     <Compile Include="Tasks\PipelineBuilder.cs" />
-    <Compile Include="Tasks\ResolveTypeTask.cs" />
+    <Compile Include="Tasks\ConvertToWrapperTasks.cs" />
     <Compile Include="Producers\LdapProducer.cs" />
     <Compile Include="Tasks\ObjectPropertyTasks.cs" />
     <Compile Include="Tasks\ACLTasks.cs" />

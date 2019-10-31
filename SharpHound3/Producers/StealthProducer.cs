@@ -22,7 +22,7 @@ namespace SharpHound3.Producers
             Console.WriteLine("[+] Finding Stealth Targets from LDAP Properties");
             Console.WriteLine();
             var targetSids = await FindPathTargetSids();
-            ResolveTypeTask.SetStealthTargetSids(targetSids);
+            ConvertToWrapperTasks.SetStealthTargetSids(targetSids);
             var token = Helpers.GetCancellationToken();
             OutputTasks.StartOutputTimer();
             foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree))

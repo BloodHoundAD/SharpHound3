@@ -14,14 +14,12 @@ namespace SharpHound3.LdapWrappers
             LocalAdmins = new GenericMember[0];
             DcomUsers = new GenericMember[0];
             PSRemoteUsers = new GenericMember[0];
-            AffectedComputers = new string[0];
         }
 
         public bool ACLProtected { get; set; }
         public string[] Users { get; set; }
         public string[] Computers { get; set; }
         public string[] ChildOus { get; set; }
-        public string[] AffectedComputers { get; set; }
         public GenericMember[] RemoteDesktopUsers { get; set; }
         public GenericMember[] LocalAdmins { get; set; }
         public GenericMember[] DcomUsers { get; set; }
