@@ -48,7 +48,8 @@ namespace SharpHound3
             0x00, 0x01
         };
         private static readonly Regex SPNRegex = new Regex(@".*\/.*", RegexOptions.Compiled);
-        private static readonly string ProcStartTime = $"{DateTime.Now:yyyyMMddHHmmss}";
+        private static string _procStartTime = $"{DateTime.Now:yyyyMMddHHmmss}";
+        private static string _currentLoopTime = $"{DateTime.Now:yyyyMMddHHmmss}";
 
         internal static CancellationToken GetCancellationToken()
         {
@@ -58,6 +59,12 @@ namespace SharpHound3
         internal static void InvokeCancellation()
         {
             CancellationTokenSource.Cancel();
+        }
+
+        internal static void StartNewRun()
+        {
+            PingCache.Clear();
+            _currentLoopTime = $"{DateTime.Now:yyyyMMddHHmmss}";
         }
 
         internal static string ConvertSidToHexSid(string sid)
@@ -561,7 +568,6 @@ namespace SharpHound3
                 return true;
 
             var key = $"{hostname}-{port}".ToUpper();
-
             if (PingCache.TryGetValue(key, out var portOpen)) return portOpen;
 
             portOpen = CheckHostPort(hostname, port);
@@ -835,6 +841,28 @@ namespace SharpHound3
             return domainName;
         }
 
+        internal static string GetLoopFileName()
+        {
+            var options = Options.Instance;
+            var finalFilename = options.ZipFilename == null ? "BloodHoundLoopResults.zip" : $"{options.ZipFilename}.zip";
+            
+            if (options.RandomizeFilenames)
+            {
+                finalFilename = $"{Path.GetRandomFileName()}.zip";
+            }
+
+            finalFilename = $"{_procStartTime}_{finalFilename}";
+
+            if (options.OutputPrefix != null)
+            {
+                finalFilename = $"{options.OutputPrefix}_{finalFilename}";
+            }
+
+            var finalPath = Path.Combine(options.OutputDirectory, finalFilename);
+
+            return finalPath;
+        }
+
         internal static string ResolveFileName(string filename, string extension, bool addTime)
         {
             var finalFilename = filename;
@@ -848,7 +876,7 @@ namespace SharpHound3
 
             if (addTime)
             {
-                finalFilename = $"{ProcStartTime}_{finalFilename}";
+                finalFilename = $"{_currentLoopTime}_{finalFilename}";
             }
 
             if (Options.Instance.OutputPrefix != null)

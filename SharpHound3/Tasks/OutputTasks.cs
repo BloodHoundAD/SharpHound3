@@ -18,12 +18,13 @@ namespace SharpHound3.Tasks
     internal class OutputTasks
     {
         private static readonly List<string> UsedFileNames = new List<string>();
-        private static readonly Lazy<JsonFileWriter> UserOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
-        private static readonly Lazy<JsonFileWriter> GroupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
-        private static readonly Lazy<JsonFileWriter> ComputerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
-        private static readonly Lazy<JsonFileWriter> DomainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
-        private static readonly Lazy<JsonFileWriter> GpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
-        private static readonly Lazy<JsonFileWriter> OuOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
+        private static readonly List<string> ZipFileNames = new List<string>();
+        private static Lazy<JsonFileWriter> _userOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
+        private static Lazy<JsonFileWriter> _groupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
+        private static Lazy<JsonFileWriter> _computerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
+        private static Lazy<JsonFileWriter> _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
+        private static Lazy<JsonFileWriter> _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
+        private static Lazy<JsonFileWriter> _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
         private static int _lastCount;
         private static int _currentCount;
         private static Timer _statusTimer;
@@ -31,12 +32,13 @@ namespace SharpHound3.Tasks
         private static Task _computerStatusTask;
         private static readonly ConcurrentDictionary<string, int> ComputerStatusCount = new ConcurrentDictionary<string, int>();
         private static readonly BlockingCollection<ComputerStatus> ComputerStatusQueue = new BlockingCollection<ComputerStatus>();
+        internal static readonly Lazy<string> ZipPasswords = new Lazy<string>(GenerateZipPassword);
 
         internal static void StartOutputTimer()
         {
             PrintStatus();
             _statusTimer = new Timer(Options.Instance.StatusInterval);
-            _runTimer =new Stopwatch();
+            _runTimer = new Stopwatch();
             _runTimer.Start();
             _statusTimer.Elapsed += (sender, e) =>
             {
@@ -60,22 +62,22 @@ namespace SharpHound3.Tasks
             switch (wrapper)
             {
                 case Computer computer:
-                    ComputerOutput.Value.WriteObject(computer);
+                    _computerOutput.Value.WriteObject(computer);
                     break;
                 case Domain domain:
-                    DomainOutput.Value.WriteObject(domain);
+                    _domainOutput.Value.WriteObject(domain);
                     break;
                 case GPO gpo:
-                    GpoOutput.Value.WriteObject(gpo);
+                    _gpoOutput.Value.WriteObject(gpo);
                     break;
                 case Group group:
-                    GroupOutput.Value.WriteObject(group);
+                    _groupOutput.Value.WriteObject(group);
                     break;
                 case OU ou:
-                    OuOutput.Value.WriteObject(ou);
+                    _ouOutput.Value.WriteObject(ou);
                     break;
                 case User user:
-                    UserOutput.Value.WriteObject(user);
+                    _userOutput.Value.WriteObject(user);
                     break;
             }
 
@@ -95,19 +97,26 @@ namespace SharpHound3.Tasks
 
             _runTimer.Stop();
             _statusTimer.Stop();
-            if (UserOutput.IsValueCreated)
-                UserOutput.Value.CloseWriter();
-            if (ComputerOutput.IsValueCreated)
-                ComputerOutput.Value.CloseWriter();
-            if (GroupOutput.IsValueCreated)
-                GroupOutput.Value.CloseWriter();
-            if (DomainOutput.IsValueCreated)
-                DomainOutput.Value.CloseWriter();
-            if (GpoOutput.IsValueCreated)
-                GpoOutput.Value.CloseWriter();
-            if (OuOutput.IsValueCreated)
-                OuOutput.Value.CloseWriter();
+            if (_userOutput.IsValueCreated)
+                _userOutput.Value.CloseWriter();
+            if (_computerOutput.IsValueCreated)
+                _computerOutput.Value.CloseWriter();
+            if (_groupOutput.IsValueCreated)
+                _groupOutput.Value.CloseWriter();
+            if (_domainOutput.IsValueCreated)
+                _domainOutput.Value.CloseWriter();
+            if (_gpoOutput.IsValueCreated)
+                _gpoOutput.Value.CloseWriter();
+            if (_ouOutput.IsValueCreated)
+                _ouOutput.Value.CloseWriter();
 
+            _userOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
+            _groupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
+            _computerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
+            _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
+            _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
+            _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
+            
             string finalName;
             var options = Options.Instance;
 
@@ -139,9 +148,13 @@ namespace SharpHound3.Tasks
 
                 if (options.EncryptZip)
                 {
-                    var password = GenerateZipPassword();
-                    zipStream.Password = password;
-                    Console.WriteLine($"Password for Zip file is {password}. Unzip files manually to upload to interface");
+                    if (!options.Loop)
+                    {
+                        var password = ZipPasswords.Value;
+                        zipStream.Password = password;
+
+                        Console.WriteLine($"Password for Zip file is {password}. Unzip files manually to upload to interface");
+                    }
                 }
                 else
                 {
@@ -169,9 +182,67 @@ namespace SharpHound3.Tasks
                 zipStream.Finish();
             }
 
-            Console.WriteLine("Finished compressing files. Happy graphing!");
+            if (options.Loop)
+                ZipFileNames.Add(finalName);
 
-            
+            UsedFileNames.Clear();
+        }
+
+        internal static async Task CollapseLoopZipFiles()
+        {
+            var options = Options.Instance;
+            if (options.NoOutput || options.NoZip)
+                return;
+
+            var finalName = Helpers.GetLoopFileName();
+
+            Console.WriteLine($"Compressing zip files to {finalName}");
+
+            var buffer = new byte[4096];
+
+            if (File.Exists(finalName))
+            {
+                Console.WriteLine("Zip File already exists, randomizing filename");
+                finalName = Helpers.ResolveFileName(Path.GetRandomFileName(), "zip", true);
+                Console.WriteLine($"New filename is {finalName}");
+            }
+
+            using (var zipStream = new ZipOutputStream(File.Create(finalName)))
+            {
+                //Set level to 0, since we're just storing the other zips
+                zipStream.SetLevel(0);
+
+                if (options.EncryptZip)
+                {
+                    var password = ZipPasswords.Value;
+                    zipStream.Password = password;
+                    Console.WriteLine($"Password for zip file is {password}. Unzip files manually to upload to interface");
+                }
+                else
+                {
+                    Console.WriteLine("Unzip the zip file and upload the other zips to the interface");
+                }
+
+                foreach (var file in ZipFileNames)
+                {
+                    var entry = new ZipEntry(Path.GetFileName(file)) { DateTime = DateTime.Now };
+                    zipStream.PutNextEntry(entry);
+
+                    using (var fileStream = File.OpenRead(file))
+                    {
+                        int source;
+                        do
+                        {
+                            source = await fileStream.ReadAsync(buffer, 0, buffer.Length);
+                            zipStream.Write(buffer, 0, source);
+                        } while (source > 0);
+                    }
+
+                    File.Delete(file);
+                }
+
+                zipStream.Finish();
+            }
         }
 
         private static string GenerateZipPassword()

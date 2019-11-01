@@ -11,6 +11,8 @@ namespace SharpHound3
     {
         public static Options Instance { get; set; }
 
+        internal TimeSpan defaultTimeSpan = TimeSpan.FromHours(8);
+
         //Collection Options
         [Option('c', "CollectionMethod", Default = new[] { "Default"})]
         public IEnumerable<string> CollectionMethods { get; set; }
@@ -18,11 +20,11 @@ namespace SharpHound3
         [Option(HelpText = "Use Stealth Targetting/Enumeration Options", Default = false)]
         public bool Stealth { get; set; }
 
-        [Option(HelpText = "Loop LoggedOn/Session Collection", Default = false)]
-        public bool Loop { get; set; }
-
         [Option(HelpText = "Specify domain for enumeration", Default = null)]
         public string Domain { get; set; }
+
+        [Option(HelpText = "Limit collection to Windows hosts only", Default = false)]
+        public bool WindowsOnly { get; set; }
 
         [Option(HelpText = "Search all domains in the forest", Default = false)]
         public bool SearchForest { get; set; }
@@ -118,10 +120,19 @@ namespace SharpHound3
         [Option('v', HelpText = "Enable Verbose Output", Default = false)]
         public bool Verbose { get; set; }
 
-        //Internal Options
-        public CollectionMethodResolved ResolvedCollectionMethods { get; set; }
+        //Loop Options
+        [Option(HelpText = "Loop Computer Collection (Default 8 hours)", Default = false)]
+        public bool Loop { get; set; }
 
-        public string CurrentUserName { get; set; }
+        [Option(HelpText = "Duration to perform looping")]
+        public TimeSpan LoopDuration { get; set; }
+
+        [Option(HelpText = "Interval to sleep between loops")]
+        public TimeSpan LoopInterval { get; set; }
+
+        //Internal Options
+        internal CollectionMethodResolved ResolvedCollectionMethods { get; set; }
+        internal string CurrentUserName { get; set; }
 
         internal bool ResolveCollectionMethods()
         {
@@ -276,6 +287,18 @@ namespace SharpHound3
             ResolvedCollectionMethods = resolved;
 
             return true;
+        }
+
+        /// <summary>
+        /// Removes non-computer collection methods from specified ones for looping
+        /// </summary>
+        /// <returns></returns>
+        internal CollectionMethodResolved GetLoopCollectionMethods()
+        {
+            var original = ResolvedCollectionMethods;
+            const CollectionMethodResolved computerCollectionMethods = CollectionMethodResolved.LocalGroups | CollectionMethodResolved.LoggedOn |
+                                                  CollectionMethodResolved.Sessions;
+            return original & computerCollectionMethods;
         }
 
         internal bool IsComputerCollectionSet()

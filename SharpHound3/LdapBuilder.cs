@@ -91,6 +91,12 @@ namespace SharpHound3
             {
                 finalFilter = $"(&({finalFilter})({userFilter}))";
             }
+
+            if (Options.Instance.WindowsOnly)
+            {
+                finalFilter = $"(&({finalFilter})(operatingsystem=*windows*))";
+            }
+
             return new LdapQueryData
             {
                 LdapFilter = finalFilter,

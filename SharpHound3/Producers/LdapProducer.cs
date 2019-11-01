@@ -1,4 +1,5 @@
-﻿using System.DirectoryServices.Protocols;
+﻿using System;
+using System.DirectoryServices.Protocols;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using SharpHound3.Tasks;
@@ -18,8 +19,11 @@ namespace SharpHound3.Producers
             foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree))
             {
                 if (token.IsCancellationRequested)
+                {
+                    Console.WriteLine("[-] Terminating Producer as cancellation was requested. Waiting for pipeline to finish");
                     break;
-                await queue.SendAsync(searchResult, token);
+                }
+                await queue.SendAsync(searchResult);
             }
             queue.Complete();
         }

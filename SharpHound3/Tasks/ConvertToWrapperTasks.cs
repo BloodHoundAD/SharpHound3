@@ -5,36 +5,12 @@ using System.Linq;
 using System.Security.Policy;
 using SharpHound3.Enums;
 using SharpHound3.LdapWrappers;
+using SharpHound3.Producers;
 
 namespace SharpHound3.Tasks
 {
     internal static class ConvertToWrapperTasks
     {
-        private static HashSet<string> _stealthTargetSids;
-        private static HashSet<string> _domainControllerSids;
-
-        internal static void SetStealthTargetSids(HashSet<string> targets)
-        {
-            if (_stealthTargetSids == null)
-                _stealthTargetSids = targets;
-            else
-            {
-                _stealthTargetSids.UnionWith(targets);
-            }
-        }
-
-        internal static void SetDomainControllerSids(HashSet<string> dcs)
-        {
-            if (_domainControllerSids == null)
-            {
-                _domainControllerSids = dcs;
-            }
-            else
-            {
-                _domainControllerSids.UnionWith(dcs);
-            }
-        }
-
         internal static LdapWrapper CreateLdapWrapper(SearchResultEntry searchResultEntry)
         {
             //Look for a null DN first. Not sure why this would happen.
@@ -194,12 +170,12 @@ namespace SharpHound3.Tasks
 
             if (wrapper is Computer computer)
             {
-                if (opts.Stealth && _stealthTargetSids.Contains(computer.ObjectIdentifier))
+                if (opts.Stealth && StealthProducer.IsSidStealthTarget(computer.ObjectIdentifier))
                 {
                     computer.IsStealthTarget = true;
                 }
 
-                if (opts.ExcludeDomainControllers && _domainControllerSids.Contains(computer.ObjectIdentifier))
+                if (opts.ExcludeDomainControllers && BaseProducer.IsSidDomainController(computer.ObjectIdentifier))
                 {
                     computer.IsDomainController = true;
                 }
