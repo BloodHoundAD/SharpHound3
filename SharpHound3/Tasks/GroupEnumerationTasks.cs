@@ -90,7 +90,12 @@ namespace SharpHound3.Tasks
 
                 foreach (var groupMemberDistinguishedName in range)
                 {
-                    finalMembers.Add(await TranslateDistinguishedName(groupMemberDistinguishedName));
+                    var member = await TranslateDistinguishedName(groupMemberDistinguishedName);
+                    if (member.MemberId == null)
+                    {
+                        member.MemberId = groupMemberDistinguishedName;
+                    }
+                    finalMembers.Add(member);
                     count++;
                 }
 
@@ -101,7 +106,12 @@ namespace SharpHound3.Tasks
             {
                 foreach (var groupMemberDistinguishedName in groupMembers)
                 {
-                    finalMembers.Add(await TranslateDistinguishedName(groupMemberDistinguishedName));
+                    var member = await TranslateDistinguishedName(groupMemberDistinguishedName);
+                    if (member.MemberId == null)
+                    {
+                        member.MemberId = groupMemberDistinguishedName;
+                    }
+                    finalMembers.Add(member);
                 }
             }
 
@@ -207,7 +217,7 @@ namespace SharpHound3.Tasks
             type = searchResult.GetLdapType();
             return new GenericMember
             {
-                MemberId = searchResult.GetSid(),
+                MemberId = searchResult.GetSid() ?? distinguishedName,
                 MemberType = type
             };
         }
