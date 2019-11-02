@@ -15,6 +15,7 @@ namespace SharpHound3.LdapWrappers
             Aces = new ACL[0];
         }
 
+        [JsonIgnore]
         public string DisplayName { get; set; }
         public string ObjectIdentifier { get; set; }
         [JsonIgnore] public string DistinguishedName { get; set; }
