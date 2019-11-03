@@ -207,7 +207,7 @@ namespace SharpHound3.Tasks
                             {
                                 aces.Add(new ACL
                                 {
-                                    AceType = "",
+                                    AceType = "All",
                                     RightName = "ExtendedRight",
                                     PrincipalSID = principalSid,
                                     PrincipalType = principalType
