@@ -21,9 +21,9 @@ namespace SharpHound3.LdapWrappers
         [JsonIgnore] public string DistinguishedName { get; set; }
 
         public Dictionary<string, object> Properties = new Dictionary<string, object>();
-
         public ACL[] Aces { get; set; }
 
+        [JsonIgnore]
         internal string Domain
         {
             get => _domain ?? (_domain = Helpers.DistinguishedNameToDomain(DistinguishedName));

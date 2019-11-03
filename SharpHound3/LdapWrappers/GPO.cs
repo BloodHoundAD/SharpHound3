@@ -8,7 +8,5 @@ namespace SharpHound3.LdapWrappers
         {
             
         }
-
-        
     }
 }

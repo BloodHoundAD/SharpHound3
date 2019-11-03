@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Heijden.DNS;
 using SharpHound3.Enums;
+using SharpHound3.Tasks;
 using Domain = System.DirectoryServices.ActiveDirectory.Domain;
 
 namespace SharpHound3
@@ -188,6 +189,13 @@ namespace SharpHound3
 
             if (IPAddress.TryParse(newHostname, out var ipAddress))
             {
+                //Try to turn IPv6 into an IPv4 via DNS
+                if (ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
+                {
+                    var addresses = await Dns.GetHostAddressesAsync(ipAddress.ToString());
+                    ipAddress = addresses.DefaultIfEmpty(ipAddress).FirstOrDefault(addr => addr.AddressFamily == AddressFamily.InterNetwork);
+                }
+
                 var query = resolver.Query(Resolver.GetArpaFromIp(ipAddress), QType.PTR);
                 if (query.RecordsPTR.Length > 0)
                 {
@@ -331,9 +339,14 @@ namespace SharpHound3
             {
                 if (sid == "S-1-5-9")
                 {
-                    return $"{GetForestName(domain)}-{sid}";
+                    var forest = GetForestName(domain);
+                    OutputTasks.SeenCommonPrincipals.TryAdd(forest, sid);
+                    return $"{forest}-{sid}";
                 }
-                return $"{NormalizeDomainName(domain)}-{sid}";
+
+                var nDomain = NormalizeDomainName(domain);
+                OutputTasks.SeenCommonPrincipals.TryAdd(nDomain, sid);
+                return $"{nDomain}-{sid}";
             }
 
             return sid;

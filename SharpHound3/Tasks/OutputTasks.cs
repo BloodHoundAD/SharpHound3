@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using ICSharpCode.SharpZipLib.Zip;
 using Newtonsoft.Json;
+using SharpHound3.Enums;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
 using Group = SharpHound3.LdapWrappers.Group;
@@ -33,6 +34,7 @@ namespace SharpHound3.Tasks
         private static readonly ConcurrentDictionary<string, int> ComputerStatusCount = new ConcurrentDictionary<string, int>();
         private static readonly BlockingCollection<ComputerStatus> ComputerStatusQueue = new BlockingCollection<ComputerStatus>();
         internal static readonly Lazy<string> ZipPasswords = new Lazy<string>(GenerateZipPassword);
+        internal static ConcurrentDictionary<string, string> SeenCommonPrincipals = new ConcurrentDictionary<string, string>();
 
         internal static void StartOutputTimer()
         {
@@ -93,6 +95,50 @@ namespace SharpHound3.Tasks
             {
                 CompleteComputerStatusOutput();
                 await _computerStatusTask;
+            }
+
+            //Write objects for common principals
+            foreach (var seen in SeenCommonPrincipals)
+            {
+                var domain = seen.Key;
+                var sid = seen.Value;
+
+                CommonPrincipal.GetCommonSid(sid, out var principal);
+
+                sid = Helpers.ConvertCommonSid(sid, domain);
+                switch (principal.Type)
+                {
+                    case LdapTypeEnum.User:
+                        var u = new User(null)
+                        {
+                            ObjectIdentifier = sid
+                        };
+                        u.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                        u.Properties.Add("domain", domain);
+                        _userOutput.Value.WriteObject(u);
+                        break;
+                    case LdapTypeEnum.Computer:
+                        var c = new Computer(null)
+                        {
+                            ObjectIdentifier = sid
+                        };
+
+                        c.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                        c.Properties.Add("domain", domain);
+                        _computerOutput.Value.WriteObject(c);
+                        break;
+                    case LdapTypeEnum.Group:
+                        var g = new Group(null)
+                        {
+                            ObjectIdentifier = sid
+                        };
+                        g.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                        g.Properties.Add("domain", domain);
+                        _groupOutput.Value.WriteObject(g);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
             }
 
             _runTimer.Stop();
