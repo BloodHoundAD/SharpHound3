@@ -44,22 +44,25 @@ namespace SharpHound3.Tasks
             var ownerSid = ProcessACESID(descriptor.GetOwner(typeof(SecurityIdentifier)).Value);
             if (ownerSid != null)
             {
-                if (CommonPrincipal.GetCommonSid(ownerSid, out _))
+                if (CommonPrincipal.GetCommonSid(ownerSid, out var commonPrincipal))
                 {
                     aces.Add(new ACL
                     {
                         PrincipalSID = Helpers.ConvertCommonSid(ownerSid, wrapper.Domain),
                         RightName = "Owner",
-                        AceType = ""
+                        AceType = "",
+                        PrincipalType = commonPrincipal.Type
                     });
                 }
                 else
                 {
+                    var ownerType = await Helpers.LookupSidType(ownerSid);
                     aces.Add(new ACL
                     {
                         PrincipalSID = ownerSid,
                         RightName = "Owner",
-                        AceType = ""
+                        AceType = "",
+                        PrincipalType = ownerType
                     });
                 }
             }
