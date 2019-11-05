@@ -341,7 +341,7 @@ namespace SharpHound3
                 {
                     var forest = GetForestName(domain);
                     OutputTasks.SeenCommonPrincipals.TryAdd(forest, sid);
-                    return $"{forest}-{sid}";
+                    return $"{forest}-{sid}".ToUpper();
                 }
 
                 var nDomain = NormalizeDomainName(domain);
