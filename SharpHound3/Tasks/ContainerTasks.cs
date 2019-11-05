@@ -130,6 +130,7 @@ namespace SharpHound3.Tasks
             domain.Computers = computers.ToArray();
             domain.Users = users.ToArray();
             domain.ChildOus = ous.ToArray();
+            domain.Links = resolvedLinks.ToArray();
         }
 
         private static async Task ProcessOUObject(OU ou)
@@ -211,6 +212,7 @@ namespace SharpHound3.Tasks
             ou.Computers = computers.ToArray();
             ou.Users = users.ToArray();
             ou.ChildOus = ous.ToArray();
+            ou.Links = resolvedLinks.ToArray();
         }
     }
 }

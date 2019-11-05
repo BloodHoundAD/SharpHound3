@@ -14,8 +14,10 @@ namespace SharpHound3.LdapWrappers
             LocalAdmins = new GenericMember[0];
             DcomUsers = new GenericMember[0];
             PSRemoteUsers = new GenericMember[0];
+            Links = new GPLink[0];
         }
 
+        public GPLink[] Links { get; set; }
         public bool ACLProtected { get; set; }
         public string[] Users { get; set; }
         public string[] Computers { get; set; }
