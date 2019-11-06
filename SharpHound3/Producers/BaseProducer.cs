@@ -23,10 +23,7 @@ namespace SharpHound3.Producers
             Query = query;
             Props = props;
             DomainName = domainName;
-            if (Options.Instance.ExcludeDomainControllers)
-            {
-                SetDomainControllerSids(GetDomainControllerSids());
-            }
+            SetDomainControllerSids(GetDomainControllerSids());
         }
 
         private static void SetDomainControllerSids(Dictionary<string, SearchResultEntry> dcs)
@@ -47,6 +44,11 @@ namespace SharpHound3.Producers
         internal static bool IsSidDomainController(string sid)
         {
             return _domainControllerSids.ContainsKey(sid);
+        }
+
+        internal static Dictionary<string, SearchResultEntry> GetDCSids()
+        {
+            return _domainControllerSids;
         }
 
         internal Task StartProducer(ITargetBlock<SearchResultEntry> queue)
