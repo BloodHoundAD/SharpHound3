@@ -20,9 +20,12 @@ namespace SharpHound3.Tasks
             var resolvedMethods = options.ResolvedCollectionMethods;
             var ldapVariables = LdapBuilder.BuildLdapQuery(resolvedMethods);
             BaseProducer producer;
-            if (Options.Instance.Stealth)
+            if (options.Stealth)
             {
                 producer = new StealthProducer(domain, ldapVariables.LdapFilter, ldapVariables.LdapProperties);
+            }else if (options.ComputerFile != null)
+            {
+                producer = new ComputerFileProducer(domain, null, ldapVariables.LdapProperties);
             }
             else
             {

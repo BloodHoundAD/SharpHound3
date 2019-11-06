@@ -26,6 +26,9 @@ namespace SharpHound3
         [Option(HelpText = "Limit collection to Windows hosts only", Default = false)]
         public bool WindowsOnly { get; set; }
 
+        [Option(HelpText = "Path to textfile containing line seperated computer names/sids", Default = null)]
+        public string ComputerFile { get; set; }
+
         //Output Options
         [Option(HelpText = "Don't output data from this run. Used for debugging purposes", Hidden = true)]
         public bool NoOutput { get; set; }
