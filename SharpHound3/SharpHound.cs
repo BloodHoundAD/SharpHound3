@@ -72,6 +72,16 @@ namespace SharpHound3
                 return;
             }
 
+            var searcher = Helpers.GetDirectorySearcher(options.Domain);
+            var result = await searcher.GetOne($"(objectsid={Helpers.ConvertSidToHexSid("S-1-5-32-544")})", new[] {"objectsid"},
+                SearchScope.Subtree);
+
+            if (result == null)
+            {
+                Console.WriteLine("LDAP Connection Test Failed. Check if you're in a domain context!");
+                return;
+            }
+
             var initialCompleted = false;
             var needsCancellation = false;
             Timer timer = null;

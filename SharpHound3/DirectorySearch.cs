@@ -90,9 +90,7 @@ namespace SharpHound3
                 {
                     var response = await task;
                     if (response.Entries.Count == 0)
-                    {
                         return null;
-                    }
 
                     return response.Entries[0];
                 }
@@ -105,6 +103,8 @@ namespace SharpHound3
             {
                 if (!globalCatalog)
                     _connectionPool.Add(connection);
+                else
+                    connection.Dispose();
             }
         }
 
@@ -189,7 +189,7 @@ namespace SharpHound3
                         PartialResultProcessing.NoPartialResultSupport, null,null);
                     var task = Task<SearchResponse>.Factory.FromAsync(iASyncResult, x => (SearchResponse)connection.EndSendRequest(x));
                     var response = await task;
-                    //There should only be one searchresultentry
+                    //There should only be one SearchResultEntry
                     if (response?.Entries.Count == 1)
                     {
                         var entry = response.Entries[0];
