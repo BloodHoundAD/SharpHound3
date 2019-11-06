@@ -50,7 +50,7 @@ namespace SharpHound3
             if (!(s[0] is byte[] sidBytes) || sidBytes.Length == 0)
                 return null;
 
-            return new SecurityIdentifier(sidBytes, 0).Value;
+            return new SecurityIdentifier(sidBytes, 0).Value.ToUpper();
         }
 
         public static string[] GetPropertyAsArray(this SearchResultEntry searchResultEntry, string property)

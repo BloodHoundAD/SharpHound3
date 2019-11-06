@@ -330,7 +330,7 @@ namespace SharpHound3.Tasks
                 return null;
             }
 
-            return sid;
+            return sid.ToUpper();
         }
     }
 }

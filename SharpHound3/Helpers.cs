@@ -409,7 +409,7 @@ namespace SharpHound3
             {
                 var account = new NTAccount($"{accountDomain}\\{accountName}");
                 var translated = account.Translate(typeof(SecurityIdentifier));
-                var sid = translated.Value;
+                var sid = translated.Value.ToUpper();
                 return (true, sid);
             }
             catch
@@ -765,7 +765,7 @@ namespace SharpHound3
                 return null;
             }
 
-            var domainSid = identifier.AccountDomainSid.Value;
+            var domainSid = identifier.AccountDomainSid.Value.ToUpper();
 
             if (SidToDomainNameCache.TryGetValue(domainSid, out var domainName))
             {
@@ -822,7 +822,7 @@ namespace SharpHound3
             var referencedDomain = new StringBuilder();
             var domainLength = (uint)referencedDomain.Capacity;
 
-            var securityIdentifier = new SecurityIdentifier("S-1-5-21-3130019616-2776909439-2417379446");
+            var securityIdentifier = new SecurityIdentifier(sid);
             var sidBytes = new byte[securityIdentifier.BinaryLength];
             securityIdentifier.GetBinaryForm(sidBytes, 0);
 
