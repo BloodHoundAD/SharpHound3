@@ -457,7 +457,7 @@ namespace SharpHound3
                 return (false, null);
             }
 
-            var guid = new Guid(guidBytes).ToString();
+            var guid = new Guid(guidBytes).ToString().ToUpper();
             return (true, guid);
         }
 

@@ -95,7 +95,7 @@ namespace SharpHound3
             }
 
             var guidBytes = searchResultEntry.GetPropertyAsBytes("objectguid");
-            return new Guid(guidBytes).ToString();
+            return new Guid(guidBytes).ToString().ToUpper();
         }
 
         /// <summary>

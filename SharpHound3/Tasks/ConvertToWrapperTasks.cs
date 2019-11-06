@@ -145,7 +145,7 @@ namespace SharpHound3.Tasks
             wrapper.DistinguishedName = distinguishedName;
             wrapper.Properties.Add("name", wrapper.DisplayName);
             wrapper.Properties.Add("domain", wrapper.Domain);
-            wrapper.Properties.Add("objectid", objectIdentifier);
+            wrapper.Properties.Add("objectid", objectIdentifier.ToUpper());
             wrapper.Properties.Add("distinguishedname", distinguishedName);
             wrapper.ObjectIdentifier = objectIdentifier;
             PostProcessWrapper(wrapper);
