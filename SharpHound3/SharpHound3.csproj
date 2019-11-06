@@ -92,6 +92,7 @@
     <Compile Include="LdapWrappers\OU.cs" />
     <Compile Include="LdapWrappers\User.cs" />
     <Compile Include="Producers\BaseProducer.cs" />
+    <Compile Include="Producers\ComputerFileProducer.cs" />
     <Compile Include="Producers\StealthProducer.cs" />
     <Compile Include="SharpHound.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -116,13 +117,13 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
+    <None Include="PowerShell Output\Out-CompressedDLL.ps1" />
+    <None Include="PowerShell Output\Template.ps1" />
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="PowerShellOutput\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Fody.6.0.0\build\Fody.targets" Condition="Exists('..\packages\Fody.6.0.0\build\Fody.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
