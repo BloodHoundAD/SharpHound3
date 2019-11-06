@@ -182,5 +182,11 @@ namespace SharpHound3
             Console.WriteLine("SharpHound Enumeration Completed! Happy Graphing!");
             Console.WriteLine();
         }
+
+        // Accessor function for the PS1 to work, do not change or remove
+        public static async void InvokeSharpHound(string[] args)
+        {
+            await Main(args);
+        }
     }
 }
