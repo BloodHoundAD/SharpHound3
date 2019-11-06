@@ -26,9 +26,6 @@ namespace SharpHound3
         [Option(HelpText = "Limit collection to Windows hosts only", Default = false)]
         public bool WindowsOnly { get; set; }
 
-        [Option(HelpText = "Search all domains in the forest", Default = false)]
-        public bool SearchForest { get; set; }
-
         //Output Options
         [Option(HelpText = "Don't output data from this run. Used for debugging purposes", Hidden = true)]
         public bool NoOutput { get; set; }
@@ -79,9 +76,6 @@ namespace SharpHound3
         [Option(HelpText = "Disables Kerberos Signing/Sealing making LDAP traffic viewable", Default = false)]
         public bool DisableKerberosSigning { get; set; }
 
-        [Option(HelpText = "Ignore LDAP certificates. Sometimes useful when connecting via LDAPS")]
-        public bool IgnoreLdapCertificate { get; set; }
-
         //Enumeration Options
         [Option(HelpText = "Skip SMB port checks when connecting to computers", Default = false)]
         public bool SkipPortScan { get; set; }
@@ -121,7 +115,7 @@ namespace SharpHound3
         public bool Verbose { get; set; }
 
         //Loop Options
-        [Option(HelpText = "Loop Computer Collection (Default 8 hours)", Default = false)]
+        [Option(HelpText = "Loop Computer Collection (Default 2 hours)", Default = false)]
         public bool Loop { get; set; }
 
         [Option(HelpText = "Duration to perform looping")]
