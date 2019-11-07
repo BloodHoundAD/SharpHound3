@@ -16,6 +16,7 @@ namespace SharpHound3
         private readonly string _domainName;
         private readonly Domain _domain;
         private Dictionary<string, string> _domainGuidMap;
+        private bool _isFaulted = false;
         private readonly ConcurrentBag<LdapConnection> _connectionPool = new ConcurrentBag<LdapConnection>();
 
         public DirectorySearch(string domainName = null, string domainController = null)
@@ -165,6 +166,8 @@ namespace SharpHound3
             {
                 if (!globalCatalog)
                     _connectionPool.Add(connection);
+                else
+                    connection.Dispose();
             }
         }
 
@@ -245,6 +248,7 @@ namespace SharpHound3
             }
             catch
             {
+                _isFaulted = true;
                 return null;
             }
         }
@@ -310,6 +314,9 @@ namespace SharpHound3
         private void CreateSchemaMap()
         {
             var map = new Dictionary<string, string>();
+            if (_isFaulted)
+                return;
+
             var path = _domain.Forest.Schema.Name;
 
             foreach (var result in QueryLdap("(schemaIDGUID=*)", new[] {"schemaidguid", "name"}, SearchScope.Subtree,
