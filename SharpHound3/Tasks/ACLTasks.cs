@@ -51,7 +51,8 @@ namespace SharpHound3.Tasks
                         PrincipalSID = Helpers.ConvertCommonSid(ownerSid, wrapper.Domain),
                         RightName = "Owner",
                         AceType = "",
-                        PrincipalType = commonPrincipal.Type
+                        PrincipalType = commonPrincipal.Type,
+                        IsInherited = false
                     });
                 }
                 else
@@ -62,7 +63,8 @@ namespace SharpHound3.Tasks
                         PrincipalSID = ownerSid,
                         RightName = "Owner",
                         AceType = "",
-                        PrincipalType = ownerType
+                        PrincipalType = ownerType,
+                        IsInherited = false
                     });
                 }
             }
@@ -73,7 +75,6 @@ namespace SharpHound3.Tasks
                 //Ignore Null Aces
                 if (ace == null)
                     continue;
-
                 //Ignore deny aces
                 if (ace.AccessControlType == AccessControlType.Deny)
                     continue;
@@ -100,7 +101,8 @@ namespace SharpHound3.Tasks
 
                 var rights = ace.ActiveDirectoryRights;
                 var objectAceType = ace.ObjectType.ToString();
-                
+                var isInherited = ace.IsInherited;
+
                 if (rights.HasFlag(ActiveDirectoryRights.GenericAll))
                 {
                     if (objectAceType == AllGuid || objectAceType == "")
@@ -110,7 +112,8 @@ namespace SharpHound3.Tasks
                             PrincipalSID = principalSid,
                             RightName = "GenericAll",
                             AceType = "",
-                            PrincipalType = principalType
+                            PrincipalType = principalType,
+                            IsInherited = isInherited
                         });
                     }
                     //GenericAll includes every other right, and we dont want to duplicate. So continue in the loop
@@ -125,7 +128,8 @@ namespace SharpHound3.Tasks
                         PrincipalSID = principalSid,
                         AceType = "",
                         RightName = "WriteDacl",
-                        PrincipalType = principalType
+                        PrincipalType = principalType,
+                        IsInherited = isInherited
                     });
                 }
 
@@ -136,7 +140,8 @@ namespace SharpHound3.Tasks
                         RightName = "WriteOwner",
                         AceType = "",
                         PrincipalSID = principalSid,
-                        PrincipalType = principalType
+                        PrincipalType = principalType,
+                        IsInherited = isInherited
                     });
                 }
 
@@ -154,7 +159,8 @@ namespace SharpHound3.Tasks
                                     AceType = "GetChanges",
                                     RightName = "ExtendedRight",
                                     PrincipalSID = principalSid,
-                                    PrincipalType = principalType
+                                    PrincipalType = principalType,
+                                    IsInherited = isInherited
                                 });
                                 break;
                             case "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2":
@@ -163,7 +169,8 @@ namespace SharpHound3.Tasks
                                     AceType = "GetChangesAll",
                                     RightName = "ExtendedRight",
                                     PrincipalSID = principalSid,
-                                    PrincipalType = principalType
+                                    PrincipalType = principalType,
+                                    IsInherited = isInherited
                                 });
                                 break;
                             case AllGuid:
@@ -173,7 +180,8 @@ namespace SharpHound3.Tasks
                                     AceType = "All",
                                     RightName = "ExtendedRight",
                                     PrincipalSID = principalSid,
-                                    PrincipalType = principalType
+                                    PrincipalType = principalType,
+                                    IsInherited = isInherited
                                 });
                                 break;
                         }
@@ -187,7 +195,8 @@ namespace SharpHound3.Tasks
                                     AceType = "User-Force-Change-Password",
                                     PrincipalSID = principalSid,
                                     RightName = "ExtendedRight",
-                                    PrincipalType = principalType
+                                    PrincipalType = principalType,
+                                    IsInherited = isInherited
                                 });
                                 break;
                             case AllGuid:
@@ -197,7 +206,8 @@ namespace SharpHound3.Tasks
                                     AceType = "All",
                                     PrincipalSID = principalSid,
                                     RightName = "ExtendedRight",
-                                    PrincipalType = principalType
+                                    PrincipalType = principalType,
+                                    IsInherited = isInherited
                                 });
                                 break;
                         }
@@ -213,7 +223,8 @@ namespace SharpHound3.Tasks
                                     AceType = "All",
                                     RightName = "ExtendedRight",
                                     PrincipalSID = principalSid,
-                                    PrincipalType = principalType
+                                    PrincipalType = principalType,
+                                    IsInherited = isInherited
                                 });
                             }else if (mappedGuid != null && mappedGuid == "ms-Mcs-AdmPwd")
                             {
@@ -222,7 +233,8 @@ namespace SharpHound3.Tasks
                                     AceType = "",
                                     RightName = "ReadLAPSPassword",
                                     PrincipalSID = principalSid,
-                                    PrincipalType = principalType
+                                    PrincipalType = principalType,
+                                    IsInherited = isInherited
                                 });
                             }
                         }
@@ -241,7 +253,8 @@ namespace SharpHound3.Tasks
                             AceType = "",
                             RightName = "GenericWrite",
                             PrincipalSID = principalSid,
-                            PrincipalType = principalType
+                            PrincipalType = principalType,
+                            IsInherited = isInherited
                         });
                     }
 
@@ -254,7 +267,8 @@ namespace SharpHound3.Tasks
                                 AceType = "WriteSPN",
                                 RightName = "WriteProperty",
                                 PrincipalSID = principalSid,
-                                PrincipalType = principalType
+                                PrincipalType = principalType,
+                                IsInherited = isInherited
                             });
                         }
                     }else if (wrapper is Group)
@@ -266,7 +280,8 @@ namespace SharpHound3.Tasks
                                 AceType = "AddMember",
                                 RightName = "WriteProperty",
                                 PrincipalSID = principalSid,
-                                PrincipalType = principalType
+                                PrincipalType = principalType,
+                                IsInherited = isInherited
                             });
                         }
                     }else if (wrapper is Computer)
@@ -278,7 +293,8 @@ namespace SharpHound3.Tasks
                                 AceType = "AllowedToAct",
                                 RightName = "WriteProperty",
                                 PrincipalSID = principalSid,
-                                PrincipalType = principalType
+                                PrincipalType = principalType,
+                                IsInherited = isInherited
                             });
                         }
                     }
