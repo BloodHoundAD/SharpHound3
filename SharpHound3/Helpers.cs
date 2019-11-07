@@ -49,7 +49,7 @@ namespace SharpHound3
             0x00, 0x01
         };
         private static readonly Regex SPNRegex = new Regex(@".*\/.*", RegexOptions.Compiled);
-        private static string _procStartTime = $"{DateTime.Now:yyyyMMddHHmmss}";
+        private static readonly string ProcStartTime = $"{DateTime.Now:yyyyMMddHHmmss}";
         private static string _currentLoopTime = $"{DateTime.Now:yyyyMMddHHmmss}";
 
         internal static CancellationToken GetCancellationToken()
@@ -864,7 +864,7 @@ namespace SharpHound3
                 finalFilename = $"{Path.GetRandomFileName()}.zip";
             }
 
-            finalFilename = $"{_procStartTime}_{finalFilename}";
+            finalFilename = $"{ProcStartTime}_{finalFilename}";
 
             if (options.OutputPrefix != null)
             {
