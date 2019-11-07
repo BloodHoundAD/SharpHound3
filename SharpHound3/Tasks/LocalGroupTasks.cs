@@ -140,7 +140,7 @@ namespace SharpHound3.Tasks
                     continue;
 
                 LdapTypeEnum type;
-                string finalSid = sid;
+                var finalSid = sid;
                 if (CommonPrincipal.GetCommonSid(finalSid, out var common))
                 {
                     finalSid = Helpers.ConvertCommonSid(sid, null);

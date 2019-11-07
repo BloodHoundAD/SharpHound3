@@ -102,6 +102,12 @@ namespace SharpHound3.Tasks
                 blocks.Add(block);
             }
 
+            if ((resolvedMethods & CollectionMethodResolved.Trusts) != 0)
+            {
+                block = new TransformBlock<LdapWrapper, LdapWrapper>(TrustTasks.ResolveDomainTrusts, executionOptions);
+                blocks.Add(block);
+            }
+
             //Start computer block
 
             //Only add this block if there's actually computer collection happening AND we're not skipping ping

@@ -20,7 +20,7 @@ namespace SharpHound3.LdapWrappers
         public string[] Users { get; set; }
         public string[] Computers { get; set; }
         public string[] ChildOus { get; set; }
-
+        public Trust[] Trusts { get; set; }
         public GPLink[] Links { get; set; }
         public GenericMember[] RemoteDesktopUsers { get; set; }
         public GenericMember[] LocalAdmins { get; set; }

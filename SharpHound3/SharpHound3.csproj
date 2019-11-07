@@ -83,6 +83,7 @@
     <Compile Include="JSON\GenericMember.cs" />
     <Compile Include="JSON\Session.cs" />
     <Compile Include="JSON\SPNTarget.cs" />
+    <Compile Include="JSON\Trust.cs" />
     <Compile Include="LdapBuilder.cs" />
     <Compile Include="LdapWrappers\Computer.cs" />
     <Compile Include="LdapWrappers\Domain.cs" />
