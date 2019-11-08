@@ -6,7 +6,7 @@ namespace SharpHound3.Enums
     {
         None,
         Group,
-        Sessions,
+        Session,
         LoggedOn,
         Trusts,
         ACL,
@@ -21,6 +21,7 @@ namespace SharpHound3.Enums
         LocalGroup,
         Default,
         DCOnly,
+        ComputerOnly,
         All
     }
 

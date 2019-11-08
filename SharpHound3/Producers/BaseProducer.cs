@@ -11,7 +11,7 @@ namespace SharpHound3.Producers
 {
     internal abstract class BaseProducer
     {
-        protected static Dictionary<string, SearchResultEntry> _domainControllerSids;
+        protected static Dictionary<string, SearchResultEntry> DomainControllerSids;
         protected readonly DirectorySearch Searcher;
         protected readonly string Query;
         protected readonly string[] Props;
@@ -28,27 +28,27 @@ namespace SharpHound3.Producers
 
         private static void SetDomainControllerSids(Dictionary<string, SearchResultEntry> dcs)
         {
-            if (_domainControllerSids == null)
+            if (DomainControllerSids == null)
             {
-                _domainControllerSids = dcs;
+                DomainControllerSids = dcs;
             }
             else
             {
                 foreach (var target in dcs)
                 {
-                    _domainControllerSids.Add(target.Key, target.Value);
+                    DomainControllerSids.Add(target.Key, target.Value);
                 }
             }
         }
 
         internal static bool IsSidDomainController(string sid)
         {
-            return _domainControllerSids.ContainsKey(sid);
+            return DomainControllerSids.ContainsKey(sid);
         }
 
-        internal static Dictionary<string, SearchResultEntry> GetDCSids()
+        internal static Dictionary<string, SearchResultEntry> GetDomainControllers()
         {
-            return _domainControllerSids;
+            return DomainControllerSids;
         }
 
         internal Task StartProducer(ITargetBlock<SearchResultEntry> queue)
@@ -61,7 +61,7 @@ namespace SharpHound3.Producers
             Console.WriteLine("[+] Pre-populating Domain Controller SIDS");
             var temp = new Dictionary<string, SearchResultEntry>();
             foreach (var entry in Searcher
-                .QueryLdap("(userAccountControl:1.2.840.113556.1.4.803:=8192)", new[] {"objectsid"},
+                .QueryLdap("(userAccountControl:1.2.840.113556.1.4.803:=8192)", new[] {"objectsid", "samaccountname"},
                     SearchScope.Subtree))
             {
                 var sid = entry.GetSid();

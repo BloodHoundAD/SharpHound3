@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Heijden.DNS;
 using SharpHound3.Enums;
+using SharpHound3.Producers;
 using SharpHound3.Tasks;
 using Domain = System.DirectoryServices.ActiveDirectory.Domain;
 
@@ -85,11 +86,19 @@ namespace SharpHound3
 
         internal static string GetForestName(string domain=null)
         {
-            if (domain == null)
-                return Forest.GetCurrentForest().Name;
+            try
+            {
+                if (domain == null)
+                    return Forest.GetCurrentForest().Name;
 
-            var domainObject = Domain.GetDomain(new DirectoryContext(DirectoryContextType.Domain, domain));
-            return domainObject.Forest.Name;
+                var domainObject = Domain.GetDomain(new DirectoryContext(DirectoryContextType.Domain, domain));
+                return domainObject.Forest.Name;
+            }
+            catch
+            {
+                return domain;
+            }
+            
         }
 
         internal static LdapTypeEnum SamAccountTypeToType(string samAccountType)
@@ -545,13 +554,15 @@ namespace SharpHound3
 
         private static string FindDomainDNSServer(string domain)
         {
-            var domainObj = GetDomainObject(domain);
 
-            foreach (DomainController dc in domainObj.FindAllDomainControllers())
+            foreach (var dc in BaseProducer.GetDomainControllers())
             {
-                if (CheckHostPort(dc.Name, 53))
+                var result = dc.Value;
+                var dcName = result.GetProperty("samaccountname").TrimEnd('$');
+
+                if (CheckHostPort($"{dcName}.{domain}", 53))
                 {
-                    return dc.Name;
+                    return dcName;
                 }
             }
 

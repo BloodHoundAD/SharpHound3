@@ -102,14 +102,14 @@ namespace SharpHound3.Tasks
 
             var domainName = Helpers.NormalizeDomainName(Options.Instance.Domain);
             var forestName = Helpers.GetForestName(domainName).ToUpper();
-            var dcSids = BaseProducer.GetDCSids();
+            var dcSids = BaseProducer.GetDomainControllers();
             var domainSid = new SecurityIdentifier(dcSids.First().Key).AccountDomainSid.Value.ToUpper();
 
             var enterpriseDomainControllers = new Group(null)
             {
                 ObjectIdentifier = $"{forestName}-S-1-5-9",
                 Domain = forestName,
-                Members = BaseProducer.GetDCSids().Keys.Select(sid => new GenericMember
+                Members = BaseProducer.GetDomainControllers().Keys.Select(sid => new GenericMember
                 {
                     MemberId = sid, MemberType = LdapTypeEnum.Computer
                 }).ToArray()

@@ -68,7 +68,7 @@ namespace SharpHound3.Producers
                 var targets = new List<SearchResultEntry>();
                 targets.AddRange(_stealthTargetSids.Values);
                 if (!Options.Instance.ExcludeDomainControllers)
-                    targets.AddRange(_domainControllerSids.Values);
+                    targets.AddRange(DomainControllerSids.Values);
 
                 foreach (var searchResult in targets)
                 {

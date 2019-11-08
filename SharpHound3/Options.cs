@@ -143,7 +143,7 @@ namespace SharpHound3
             var resolved = CollectionMethodResolved.None;
             foreach (var baseString in collMethodArray)
             {
-                CollectionMethodOptions option = CollectionMethodOptions.None;
+                var option = CollectionMethodOptions.None;
                 try
                 {
                     option =
@@ -173,7 +173,7 @@ namespace SharpHound3
                     case CollectionMethodOptions.Group:
                         resolved |= CollectionMethodResolved.Group;
                         break;
-                    case CollectionMethodOptions.Sessions:
+                    case CollectionMethodOptions.Session:
                         resolved |= CollectionMethodResolved.Sessions;
                         break;
                     case CollectionMethodOptions.LoggedOn:
@@ -217,6 +217,9 @@ namespace SharpHound3
                                    CollectionMethodResolved.Group | CollectionMethodResolved.LocalGroups |
                                    CollectionMethodResolved.ObjectProps | CollectionMethodResolved.Sessions |
                                    CollectionMethodResolved.Trusts | CollectionMethodResolved.SPNTargets;
+                        break;
+                    case CollectionMethodOptions.ComputerOnly:
+                        resolved = resolved | CollectionMethodResolved.LocalGroups | CollectionMethodResolved.Sessions;
                         break;
                     default:
                         throw new ArgumentOutOfRangeException();
