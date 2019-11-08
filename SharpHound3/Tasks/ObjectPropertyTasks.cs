@@ -136,7 +136,7 @@ namespace SharpHound3.Tasks
             }
 
             wrapper.AllowedToAct = allowedToActPrincipals.Distinct().ToArray();
-
+            
             wrapper.Properties.Add("serviceprincipalnames", result.GetPropertyAsArray("serviceprincipalname"));
 
             wrapper.Properties.Add("lastlogontimestamp", ConvertToUnixEpoch(result.GetProperty("lastlogontimestamp")));
@@ -242,7 +242,7 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("lastlogontimestamp", ConvertToUnixEpoch(result.GetProperty("lastlogontimestamp")));
             wrapper.Properties.Add("pwdlastset", ConvertToUnixEpoch(result.GetProperty("pwdlastset")));
 
-            var servicePrincipalNames = result.GetPropertyAsArray("serviceprincipalnames");
+            var servicePrincipalNames = result.GetPropertyAsArray("serviceprincipalname");
             wrapper.Properties.Add("serviceprincipalnames", servicePrincipalNames);
             wrapper.Properties.Add("hasspn", servicePrincipalNames.Length > 0);
 
