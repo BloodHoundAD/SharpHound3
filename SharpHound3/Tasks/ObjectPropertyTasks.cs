@@ -81,9 +81,9 @@ namespace SharpHound3.Tasks
             if (int.TryParse(userAccountControl, out var baseFlags))
             {
                 var uacFlags = (UacFlags)baseFlags;
-                enabled = uacFlags.HasFlag(UacFlags.AccountDisable);
-                trustedToAuth = uacFlags.HasFlag(UacFlags.TrustedForDelegation);
-                unconstrained = uacFlags.HasFlag(UacFlags.TrustedForDelegation);
+                enabled = (uacFlags & UacFlags.AccountDisable) == 0;
+                trustedToAuth = (uacFlags & UacFlags.TrustedToAuthForDelegation) != 0;
+                unconstrained = (uacFlags & UacFlags.TrustedForDelegation) != 0;    
             }
 
             wrapper.Properties.Add("enabled", enabled);
@@ -207,12 +207,12 @@ namespace SharpHound3.Tasks
             if (int.TryParse(userAccountControl, out var baseFlags))
             {
                 var uacFlags = (UacFlags) baseFlags;
-                enabled = uacFlags.HasFlag(UacFlags.AccountDisable);
-                trustedToAuth = uacFlags.HasFlag(UacFlags.TrustedForDelegation);
-                sensitive = uacFlags.HasFlag(UacFlags.NotDelegated);
-                dontReqPreAuth = uacFlags.HasFlag(UacFlags.DontReqPreauth);
-                passwdNotReq = uacFlags.HasFlag(UacFlags.PasswordNotRequired);
-                unconstrained = uacFlags.HasFlag(UacFlags.TrustedForDelegation);
+                enabled = (uacFlags & UacFlags.AccountDisable) == 0;
+                trustedToAuth = (uacFlags & UacFlags.TrustedToAuthForDelegation) != 0;
+                sensitive = (uacFlags & UacFlags.NotDelegated) != 0;
+                dontReqPreAuth = (uacFlags & UacFlags.DontReqPreauth) != 0;
+                passwdNotReq = (uacFlags & UacFlags.PasswordNotRequired) != 0;
+                unconstrained = (uacFlags & UacFlags.TrustedForDelegation) != 0;
             }
 
             wrapper.Properties.Add("dontreqpreauth", dontReqPreAuth);
