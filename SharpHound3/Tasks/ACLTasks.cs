@@ -313,23 +313,23 @@ namespace SharpHound3.Tasks
         /// <returns></returns>
         private static bool IsAceInherited(ObjectAccessRule ace, string guid)
         {
-            //Ace is inherited
-            if (ace.IsInherited)
+            //Check if the ace is inherited
+            var isInherited = ace.IsInherited;
+
+            //The inheritedobjecttype needs to match the guid of the object type being enumerated or the guid for All
+            var inheritedType = ace.InheritedObjectType.ToString();
+            isInherited = isInherited && (inheritedType == AllGuid || inheritedType == guid);
+
+            //Special case for Exchange
+            //If the ACE is not Inherited and is not an inherit-only ace, then it's set by exchange for reasons
+            if (!isInherited && (ace.PropagationFlags & PropagationFlags.InheritOnly) != PropagationFlags.InheritOnly &&
+                !ace.IsInherited)
             {
-                //The inheritedobjecttype needs to match the guid of the object type being enumerated or the guid for All
-                var inheritedType = ace.InheritedObjectType.ToString();
-                return inheritedType == AllGuid || inheritedType == guid;
+                isInherited = true;
             }
 
-            //The ace is NOT inherited
-            //If its marked as InheritOnly, we don't want it , because it doesn't apply to the object
-            if ((ace.PropagationFlags & PropagationFlags.InheritOnly) != 0)
-            {
-                return false;
-            }
-
-            //We've passed the other checks, we're good
-            return true;
+            //Return our isInherited value
+            return isInherited;
         }
 
         /// <summary>
