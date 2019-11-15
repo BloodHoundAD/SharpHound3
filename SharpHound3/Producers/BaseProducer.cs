@@ -61,7 +61,7 @@ namespace SharpHound3.Producers
             Console.WriteLine("[+] Pre-populating Domain Controller SIDS");
             var temp = new Dictionary<string, SearchResultEntry>();
             foreach (var entry in Searcher
-                .QueryLdap("(userAccountControl:1.2.840.113556.1.4.803:=8192)", new[] {"objectsid", "samaccountname"},
+                .QueryLdap("(&(objectclass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))", new[] {"objectsid", "samaccountname"},
                     SearchScope.Subtree))
             {
                 var sid = entry.GetSid();

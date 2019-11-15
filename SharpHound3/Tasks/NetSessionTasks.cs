@@ -122,6 +122,10 @@ namespace SharpHound3.Tasks
                     if (computerName.StartsWith("\\"))
                         computerName = computerName.TrimStart('\\');
 
+                    //Remove empty sessions
+                    if (string.IsNullOrEmpty(computerName))
+                        continue;
+
                     //If the session is pointing to localhost, we already know what the SID of the computer is
                     if (computerName.Equals("[::1]") || computerName.Equals("127.0.0.1"))
                         computerSid = computer.ObjectIdentifier;
@@ -132,7 +136,7 @@ namespace SharpHound3.Tasks
                     //Try converting the username to a SID
                     var searcher = Helpers.GetDirectorySearcher(computer.Domain);
                     var sids = await searcher.LookupUserInGC(sessionUsername);
-                    if (sids.Length > 0)
+                    if (sids?.Length > 0)
                     {
                         foreach (var sid in sids)
                         {
