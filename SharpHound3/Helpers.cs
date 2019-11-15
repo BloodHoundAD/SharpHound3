@@ -13,7 +13,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Heijden.DNS;
+using DnsClient;
 using SharpHound3.Enums;
 using SharpHound3.Producers;
 using SharpHound3.Tasks;
@@ -31,7 +31,7 @@ namespace SharpHound3
         private static readonly ConcurrentDictionary<string, string> HostResolutionMap = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, Domain> DomainObjectMap = new ConcurrentDictionary<string, Domain>();
         private static readonly ConcurrentDictionary<string, string> DomainNetbiosMap = new ConcurrentDictionary<string, string>();
-        private static readonly ConcurrentDictionary<string, Resolver> DNSResolverCache = new ConcurrentDictionary<string, Resolver>();
+        private static readonly ConcurrentDictionary<string, LookupClient> DNSResolverCache = new ConcurrentDictionary<string, LookupClient>();
         private static readonly ConcurrentDictionary<string, string> SidToDomainNameCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, bool> PingCache = new ConcurrentDictionary<string, bool>();
         private static readonly Random RandomGen = new Random();
@@ -199,69 +199,35 @@ namespace SharpHound3
 
             // Attempt to fall back to DNS
             var resolver = GetDNSResolver(domain);
-            if (resolver != null)
+
+            if (IPAddress.TryParse(newHostname, out var ipAddress))
             {
-                if (IPAddress.TryParse(newHostname, out var ipAddress))
+                var query = await resolver.QueryAsync(ipAddress.ToString(), QueryType.PTR);
+                var record = query.Answers.PtrRecords().DefaultIfEmpty(null).FirstOrDefault()?.PtrDomainName.Value;
+                if (record != null)
                 {
-                    //Try to turn IPv6 into an IPv4 via DNS
-                    if (ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
-                    {
-                        var addresses = await Dns.GetHostAddressesAsync(ipAddress.ToString());
-                        ipAddress = addresses.DefaultIfEmpty(ipAddress).FirstOrDefault(addr => addr.AddressFamily == AddressFamily.InterNetwork);
-                    }
+                    var splitName = record.Split('.');
+                    computerName = splitName[0];
+                    computerDomain = string.Join(".", splitName.Skip(1));
 
-                    var query = resolver.Query(Resolver.GetArpaFromIp(ipAddress), QType.PTR);
-                    if (query.RecordsPTR.Length > 0)
+                    var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
+                    if (success)
                     {
-                        var resolved = query.RecordsPTR[0].ToString().TrimEnd('.');
-                        var splitName = resolved.Split('.');
-                        computerName = splitName[0];
-                        computerDomain = string.Join(".", splitName.Skip(1));
-
-                        var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
-                        if (success)
-                        {
-                            HostResolutionMap.TryAdd(newHostname, sid);
-                            return sid;
-                        }
-                    }
-                }
-                else
-                {
-                    var query = resolver.Query($"{newHostname}.{NormalizeDomainName(domain)}", QType.A);
-                    if (query.RecordsA.Length > 0)
-                    {
-                        var resolved = query.RecordsA[0].RR.NAME.TrimEnd('.');
-                        var splitName = resolved.Split('.');
-                        computerName = splitName[0];
-                        computerDomain = string.Join(".", splitName.Skip(1));
-
-                        var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
-                        if (success)
-                        {
-                            HostResolutionMap.TryAdd(newHostname, sid);
-                            return sid;
-                        }
+                        HostResolutionMap.TryAdd(newHostname, sid);
+                        return sid;
                     }
                 }
             }
             else
             {
-                if (IPAddress.TryParse(newHostname, out var ipAddress))
+                var query = await resolver.QueryAsync($"{newHostname}.{NormalizeDomainName(domain)}", QueryType.A);
+                var record = query.Answers.ARecords().DefaultIfEmpty(null).FirstOrDefault()?.DomainName.Value;
+                if (record != null)
                 {
-                    var entries = await Dns.GetHostEntryAsync(ipAddress);
-                    (computerDomain, computerName) = SplitComputerName(entries.HostName);
-                    var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
-                    if (success)
-                    {
-                        HostResolutionMap.TryAdd(newHostname, sid);
-                        return sid;
-                    }
-                }
-                else
-                {
-                    var entries = await Dns.GetHostEntryAsync(newHostname);
-                    (computerDomain, computerName) = SplitComputerName(entries.HostName);
+                    var splitName = record.Split('.');
+                    computerName = splitName[0];
+                    computerDomain = string.Join(".", splitName.Skip(1));
+
                     var (success, sid) = await AccountNameToSid(computerName, computerDomain, true);
                     if (success)
                     {
@@ -270,7 +236,6 @@ namespace SharpHound3
                     }
                 }
             }
-            
 
             //Everything has failed. Life is sad. Just return the hostname, not much else to do here
             computerName = computerName ?? newHostname;
@@ -358,7 +323,7 @@ namespace SharpHound3
                     var receivedByteCount = requestSocket.ReceiveFrom(receiveBuffer, ref remoteEndpoint);
                     if (receivedByteCount >= 90)
                     {
-                        netbios = new ASCIIEncoding().GetString(receiveBuffer, 57, 16).Trim();
+                        netbios = new ASCIIEncoding().GetString(receiveBuffer, 57, 16).Trim('\0', ' ');
                         return true;
                     }
 
@@ -410,10 +375,9 @@ namespace SharpHound3
                 accountName = $"{accountName}$";
             }
 
-            string sid;
             if (Cache.Instance.GetPrincipal(accountName, out var principal))
             {
-                sid = principal.ObjectIdentifier;
+                var sid = principal.ObjectIdentifier;
                 return (sid != null, sid);
             }
 
@@ -440,17 +404,15 @@ namespace SharpHound3
         private static async Task<(bool success, string sid)> AccountNameToSidLdap(string accountName, string accountDomain)
         {
             var searcher = GetDirectorySearcher(accountDomain);
-
             var result = await searcher.GetOne($"(samaccountname={accountName.ToUpper()})", ResolutionProps,
                 SearchScope.Subtree);
 
-            string sid;
             if (result == null)
             {
                 return (false, null);
             }
 
-            sid = result.GetObjectIdentifier();
+            var sid = result.GetObjectIdentifier();
             return (sid != null, sid);
         }
 
@@ -557,7 +519,7 @@ namespace SharpHound3
         /// </summary>
         /// <param name="domain"></param>
         /// <returns>Resolver</returns>
-        private static Resolver GetDNSResolver(string domain)
+        private static LookupClient GetDNSResolver(string domain)
         {
             var domainName = NormalizeDomainName(domain);
             var key = domainName ?? NullKey;
@@ -566,7 +528,8 @@ namespace SharpHound3
                 return resolver;
 
             // Create a new resolver object which will auto populate with our local nameservers
-            resolver = new Resolver();
+            resolver = new LookupClient();
+            
             var newServerList = new List<IPEndPoint>();
 
             // Try to find a DC in our target domain that has 53 open
@@ -574,40 +537,43 @@ namespace SharpHound3
             if (dnsServer != null)
             {
                 // Resolve the DC to an IP and add it to our nameservers
-                var query = resolver.Query(dnsServer, QType.A);
-                if (query.RecordsA.Length > 0)
-                    newServerList.Add(new IPEndPoint(query.RecordsA[0].Address, 53));
+                var query = resolver.Query(dnsServer, QueryType.A);
+                var resolved = query.Answers.ARecords().DefaultIfEmpty(null).FirstOrDefault(record => record.Address.AddressFamily == AddressFamily.InterNetwork)?.Address;
+                if (resolved != null)
+                    newServerList.Add(new IPEndPoint(resolved, 53));
             }
 
-            // Add the first local dns server that isn't a VMware one to our list
-            foreach (var server in resolver.DnsServers)
-            {
-                if (server.ToString().StartsWith("fec0")) 
-                    continue;
+            newServerList.AddRange(resolver.NameServers.Select(server => server.Endpoint));
 
-                newServerList.Add(server);
-                break;
-            }
 
-            resolver.DnsServers = newServerList.ToArray();
+            resolver = new LookupClient(newServerList.ToArray());
             DNSResolverCache.TryAdd(key, resolver);
             return resolver;
         }
 
         private static string FindDomainDNSServer(string domain)
         {
-            foreach (var dc in BaseProducer.GetDomainControllers())
+            var searcher = GetDirectorySearcher(domain);
+            domain = NormalizeDomainName(domain);
+            string target = null;
+            //Find all DCs in the target domain
+            foreach (var result in searcher.QueryLdap(
+                "(&(objectclass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))",
+                new[] {"samaccountname", "dnshostname"}, SearchScope.Subtree))
             {
-                var result = dc.Value;
-                var dcName = result.GetProperty("samaccountname").TrimEnd('$');
+                
+                target = result.GetProperty("dnshostname") ?? result.GetProperty("samaccountname");
+                if (target == null)
+                    continue;
 
-                if (CheckHostPort($"{dcName}.{domain}", 53))
-                {
-                    return dcName;
-                }
+                target = $"{target}.{domain}";
+                if (CheckHostPort(target, 53))
+                    break;
+
+                target = null;
             }
 
-            return null;
+            return target;
         }
 
         internal static async Task DoDelay()
@@ -727,6 +693,8 @@ namespace SharpHound3
 
             if (Cache.Instance.GetSidType(sid, out var type))
                 return type;
+
+            Console.WriteLine(sid);
 
             if (Options.Instance.DomainController != null)
             {
