@@ -22,13 +22,21 @@ namespace SharpHound3.Tasks
             var samAccountType = searchResultEntry.GetProperty("samaccounttype");
             var accountDomain = Helpers.DistinguishedNameToDomain(distinguishedName);
             var objectSid = searchResultEntry.GetSid();
+            var objectId = searchResultEntry.GetObjectIdentifier();
+            if (objectSid == null && objectId == null)
+            {
+                
+                return null;
+            }
+                
+
             var objectType = LdapTypeEnum.Unknown;
             string objectIdentifier;
 
             LdapWrapper wrapper;
 
             //Lets see if its a "common" principal
-            if (CommonPrincipal.GetCommonSid(objectSid, out var commonPrincipal))
+            if (objectSid != null && CommonPrincipal.GetCommonSid(objectSid, out var commonPrincipal))
             {
                 accountName = commonPrincipal.Name;
                 objectType = commonPrincipal.Type;
@@ -63,7 +71,8 @@ namespace SharpHound3.Tasks
                         objectType = LdapTypeEnum.Domain;
                     }
                 }
-                objectIdentifier = searchResultEntry.GetObjectIdentifier();
+
+                objectIdentifier = objectId;
             }
 
             //Depending on the object type, create the appropriate wrapper object
@@ -138,7 +147,7 @@ namespace SharpHound3.Tasks
             if (wrapper == null)
             {
                 Console.WriteLine($"Null Wrapper: {distinguishedName}");
-                return wrapper;
+                return null;
             }
 
             //Set the DN/SID for the wrapper going forward

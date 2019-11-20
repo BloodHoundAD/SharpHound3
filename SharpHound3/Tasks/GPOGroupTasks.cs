@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.DirectoryServices.Protocols;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.XPath;
@@ -46,7 +47,7 @@ namespace SharpHound3.Tasks
 
             var gpLinks = searchResultEntry.GetProperty("gplink");
 
-            //Check if we can get gplinks first. If not, move on, theres no point
+            //Check if we can get gplinks first. If not, move on, theres no point in processing further
             if (gpLinks == null)
                 return;
 
@@ -79,7 +80,6 @@ namespace SharpHound3.Tasks
             if (affectedComputers.Count == 0)
                 return;
 
-            
             var links = gpLinks.Split(']', '[').Where(link => link.StartsWith("LDAP", true, null)).ToList();
             var enforced = new List<string>();
             var unenforced = new List<string>();
@@ -177,9 +177,8 @@ namespace SharpHound3.Tasks
                 foreach (var set in restrictedLocalGroupSets)
                 {
                     var results = data[set.Key];
-                    foreach (var gAction in set)
+                    foreach (var (_, targetSid, targetType, action) in set)
                     {
-                        var action = gAction.Action;
                         var groupResults = results.LocalGroups;
                         if (action == GroupActionOperation.DeleteGroups)
                         {
@@ -195,14 +194,14 @@ namespace SharpHound3.Tasks
                         {
                             groupResults.Add(new GenericMember
                             {
-                                MemberType = gAction.TargetType,
-                                MemberId = gAction.TargetSid
+                                MemberType = targetType,
+                                MemberId = targetSid
                             });
                         }
 
                         if (action == GroupActionOperation.Delete)
                         {
-                            groupResults.RemoveAll(x => x.MemberId == gAction.TargetSid);
+                            groupResults.RemoveAll(x => x.MemberId == targetSid);
                         }
 
                         data[set.Key].LocalGroups = groupResults;
@@ -363,23 +362,38 @@ namespace SharpHound3.Tasks
                             if (rightMatches.Count > 0 && index > 0)
                             {
                                 var sid = key.Trim('*').Substring(0, index - 3);
+
+                                if (!sid.StartsWith("S-1-5", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var (success, aSid) = await Helpers.AccountNameToSid(sid, gpoDomain, false);
+                                    if (!success)
+                                    {
+                                        (success, aSid) = await Helpers.AccountNameToSid(sid, gpoDomain, true);
+                                        sid = !success ? null : aSid;
+                                    }
+                                    else
+                                        sid = aSid;
+                                }
+                                
+                                if (sid == null || !sid.StartsWith("S-1-5", StringComparison.OrdinalIgnoreCase))
+                                    continue;
+
                                 var type = await Helpers.LookupSidType(sid);
 
                                 foreach (var match in rightMatches)
                                 {
                                     var rid = int.Parse(ExtractRid.Match(match.ToString()).Groups[1].Value);
-                                    if (Enum.IsDefined(typeof(LocalGroupRids), rid))
+                                    if (!Enum.IsDefined(typeof(LocalGroupRids), rid)) continue;
+                                    
+                                    var targetGroup = (LocalGroupRids) rid;
+                                    actions.Add(new GroupAction
                                     {
-                                        var targetGroup = (LocalGroupRids) rid;
-                                        actions.Add(new GroupAction
-                                        {
-                                            Target = GroupActionTarget.RestrictedMemberOf,
-                                            Action = GroupActionOperation.Add,
-                                            TargetRid = targetGroup,
-                                            TargetSid = sid,
-                                            TargetType = type
-                                        });
-                                    }
+                                        Target = GroupActionTarget.RestrictedMemberOf,
+                                        Action = GroupActionOperation.Add,
+                                        TargetRid = targetGroup,
+                                        TargetSid = sid,
+                                        TargetType = type
+                                    });
                                 }
                             }
                         }

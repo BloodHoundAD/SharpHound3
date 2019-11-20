@@ -48,18 +48,10 @@ namespace SharpHound3.LdapWrappers
         [JsonIgnore]
         internal bool IsDomainController { get; set; }
 
+        /// <summary>
+        /// Returns the name used for network calls, based on options set
+        /// </summary>
         [JsonIgnore]
-        public string APIName
-        {
-            get
-            {
-                if (Options.Instance.RealDNSName != null)
-                {
-                    return $"{SamAccountName}.{Options.Instance.RealDNSName}";
-                }
-
-                return DisplayName;
-            }
-        }
+        public string APIName => Options.Instance.RealDNSName != null ? $"{SamAccountName}.{Options.Instance.RealDNSName}" : DisplayName;
     }
 }

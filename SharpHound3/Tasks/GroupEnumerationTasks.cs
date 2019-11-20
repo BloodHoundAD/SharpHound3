@@ -91,10 +91,8 @@ namespace SharpHound3.Tasks
                 foreach (var groupMemberDistinguishedName in range)
                 {
                     var member = await TranslateDistinguishedName(groupMemberDistinguishedName);
-                    if (member.MemberId == null)
-                    {
-                        member.MemberId = groupMemberDistinguishedName;
-                    }
+                    if (member.MemberId == null) member.MemberId = groupMemberDistinguishedName;
+
                     finalMembers.Add(member);
                     count++;
                 }
@@ -107,10 +105,8 @@ namespace SharpHound3.Tasks
                 foreach (var groupMemberDistinguishedName in groupMembers)
                 {
                     var member = await TranslateDistinguishedName(groupMemberDistinguishedName);
-                    if (member.MemberId == null)
-                    {
-                        member.MemberId = groupMemberDistinguishedName;
-                    }
+                    if (member.MemberId == null) member.MemberId = groupMemberDistinguishedName;
+
                     finalMembers.Add(member);
                 }
             }

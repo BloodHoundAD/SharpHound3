@@ -102,8 +102,8 @@ namespace SharpHound3.Tasks
                     if (username.Trim() == "" || username.EndsWith("$"))
                         continue;
 
-                    var (sidSuccess, sid) = await Helpers.AccountNameToSid(username, domain, false);
-                    if ( sidSuccess)
+                    var (sidSuccess, sid) = await Helpers.AccountNameToSid(username, domain);
+                    if (sidSuccess)
                     {
                         sessionList.Add(new Session
                         {
@@ -156,6 +156,7 @@ namespace SharpHound3.Tasks
             }
             finally
             {
+                //Ensure we dispose of the registry key
                 key?.Dispose();
             }
 
