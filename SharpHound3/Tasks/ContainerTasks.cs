@@ -71,26 +71,20 @@ namespace SharpHound3.Tasks
             { 
                 var type = containedObject.GetLdapType();
 
-                string sid;
+                var id = containedObject.GetObjectIdentifier();
+                if (id == null)
+                    continue;
+
                 switch (type)
                 {
                     case LdapTypeEnum.OU:
-                        var guid = containedObject.GetPropertyAsBytes("objectguid");
-                        if (guid == null)
-                            continue;
-                        ous.Add(new Guid(guid).ToString().ToUpper());
+                        ous.Add(id);
                         break;
                     case LdapTypeEnum.Computer:
-                        sid = containedObject.GetSid();
-                        if (sid == null)
-                            continue;
-                        computers.Add(sid);
+                        computers.Add(id);
                         break;
                     case LdapTypeEnum.User:
-                        sid = containedObject.GetSid();
-                        if (sid == null)
-                            continue;
-                        users.Add(sid);
+                        users.Add(id);
                         break;
                     default:
                         continue;
@@ -101,26 +95,20 @@ namespace SharpHound3.Tasks
                 SearchScope.OneLevel, domain.DistinguishedName))
             {
                 var type = containedObject.GetLdapType();
-                string sid;
+                var id = containedObject.GetObjectIdentifier();
+                if (id == null)
+                    continue;
+
                 switch (type)
                 {
                     case LdapTypeEnum.OU:
-                        var guid = containedObject.GetPropertyAsBytes("objectguid");
-                        if (guid == null)
-                            continue;
-                        ous.Add(new Guid(guid).ToString().ToUpper());
+                        ous.Add(id);
                         break;
                     case LdapTypeEnum.Computer:
-                        sid = containedObject.GetSid();
-                        if (sid == null)
-                            continue;
-                        computers.Add(sid);
+                        computers.Add(id);
                         break;
                     case LdapTypeEnum.User:
-                        sid = containedObject.GetSid();
-                        if (sid == null)
-                            continue;
-                        users.Add(sid);
+                        users.Add(id);
                         break;
                     default:
                         continue;
@@ -183,26 +171,20 @@ namespace SharpHound3.Tasks
             {
                 var type = containedObject.GetLdapType();
 
-                string sid;
+                var id = containedObject.GetObjectIdentifier();
+                if (id == null)
+                    continue;
+
                 switch (type)
                 {
                     case LdapTypeEnum.OU:
-                        var guid = containedObject.GetPropertyAsBytes("objectguid");
-                        if (guid == null)
-                            continue;
-                        ous.Add(new Guid(guid).ToString().ToUpper());
+                        ous.Add(id);
                         break;
                     case LdapTypeEnum.Computer:
-                        sid = containedObject.GetSid();
-                        if (sid == null)
-                            continue;
-                        computers.Add(sid);
+                        computers.Add(id);
                         break;
                     case LdapTypeEnum.User:
-                        sid = containedObject.GetSid();
-                        if (sid == null)
-                            continue;
-                        users.Add(sid);
+                        users.Add(id);
                         break;
                     default:
                         continue;

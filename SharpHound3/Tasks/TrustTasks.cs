@@ -34,9 +34,11 @@ namespace SharpHound3.Tasks
             var trusts = searcher.QueryLdap("(objectclass=trusteddomain)", LookupProps, SearchScope.Subtree).Select(
                 trustedDomain =>
                 {
+                    var targetSid = trustedDomain.GetSid();
+                    if (targetSid == null)
+                        return null;
                     var trustDirection = (TrustDirection)int.Parse(trustedDomain.GetProperty("trustdirection"));
                     var trustAttributes = (TrustAttributes)int.Parse(trustedDomain.GetProperty("trustattributes"));
-                    var targetSid = new SecurityIdentifier(trustedDomain.GetPropertyAsBytes("securityidentifier"), 0).Value;
                     var transitive = (trustAttributes & TrustAttributes.NonTransitive) == 0;
                     var targetName = trustedDomain.GetProperty("cn").ToUpper();
 
@@ -66,7 +68,7 @@ namespace SharpHound3.Tasks
                         TrustType = trustType,
                         TargetDomainName = targetName
                     };
-                }).ToArray();
+                }).Where(trust => trust != null).ToArray();
             domain.Trusts = trusts;
         }
 

@@ -40,17 +40,40 @@ namespace SharpHound3
 
         public static string GetSid(this SearchResultEntry searchResultEntry)
         {
-            if (!searchResultEntry.Attributes.Contains("objectsid"))
+            try
+            {
+                if (!searchResultEntry.Attributes.Contains("objectsid")) return null;
+            }
+            catch (ArgumentNullException)
+            {
                 return null;
+            }
 
-            var s = searchResultEntry.Attributes["objectsid"].GetValues(typeof(byte[]));
+            object[] s;
+            try
+            {
+                s = searchResultEntry.Attributes["objectsid"].GetValues(typeof(byte[]));
+            }
+            catch (NotSupportedException)
+            {
+                return null;
+            }
+
             if (s.Length == 0)
                 return null;
 
             if (!(s[0] is byte[] sidBytes) || sidBytes.Length == 0)
                 return null;
 
-            return new SecurityIdentifier(sidBytes, 0).Value.ToUpper();
+            try
+            {
+                var sid = new SecurityIdentifier(sidBytes, 0);
+                return sid.Value.ToUpper();
+            }
+            catch (ArgumentNullException)
+            {
+                return null;
+            }
         }
 
         public static string[] GetPropertyAsArray(this SearchResultEntry searchResultEntry, string property)
@@ -94,8 +117,14 @@ namespace SharpHound3
                 return searchResultEntry.GetSid();
             }
 
-            var guidBytes = searchResultEntry.GetPropertyAsBytes("objectguid");
-            return new Guid(guidBytes).ToString().ToUpper();
+            if (searchResultEntry.Attributes.Contains("objectguid"))
+            {
+                var guidBytes = searchResultEntry.GetPropertyAsBytes("objectguid");
+
+                return new Guid(guidBytes).ToString().ToUpper();
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -107,10 +136,11 @@ namespace SharpHound3
         public static LdapTypeEnum GetLdapType(this SearchResultEntry searchResultEntry)
         {
             var objectSid = searchResultEntry.GetSid();
+            if (objectSid == null)
+                return LdapTypeEnum.Unknown;
+
             if (CommonPrincipal.GetCommonSid(objectSid, out var commonPrincipal))
-            {
                 return commonPrincipal.Type;
-            }
 
             var objectType = LdapTypeEnum.Unknown;
             var samAccountType = searchResultEntry.GetProperty("samaccounttype");

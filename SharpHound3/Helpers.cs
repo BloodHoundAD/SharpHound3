@@ -368,6 +368,56 @@ namespace SharpHound3
             return sid;
         }
 
+        internal static async Task<(bool success, string sid)> AccountNameToSid(string accountName,
+            string accountDomain)
+        {
+            if (Cache.Instance.GetPrincipal(accountName, out var principal))
+            {
+                var sid = principal.ObjectIdentifier;
+                return (sid != null, sid);
+            }
+
+            var domainName = NormalizeDomainName(accountDomain);
+            (bool success, string sid) result;
+            if (Options.Instance.DomainController != null)
+            {
+                result = await AccountNameToSidLdap(accountName, domainName);
+            }
+            else
+            {
+                result = AccountNameToSidApi(accountName, domainName);
+            }
+
+            if (result.success)
+            {
+                Cache.Instance.Add(accountName, new ResolvedPrincipal
+                {
+                    ObjectIdentifier = result.sid,
+                    ObjectType = LdapTypeEnum.User
+                });
+
+                return result;
+            }
+
+            var computerAccountName = $"{accountName}$";
+            if (Options.Instance.DomainController != null)
+            {
+                result = await AccountNameToSidLdap(computerAccountName, domainName);
+            }
+            else
+            {
+                result = AccountNameToSidApi(computerAccountName, domainName);
+            }
+
+            Cache.Instance.Add(accountName, new ResolvedPrincipal
+            {
+                ObjectIdentifier = result.sid,
+                ObjectType = LdapTypeEnum.Computer
+            });
+
+            return result;
+        }
+
         internal static async Task<(bool success, string sid)> AccountNameToSid(string accountName, string accountDomain, bool isComputer)
         {
             if (isComputer)

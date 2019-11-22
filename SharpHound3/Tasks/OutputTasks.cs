@@ -104,7 +104,6 @@ namespace SharpHound3.Tasks
             var forestName = Helpers.GetForestName(domainName).ToUpper();
             var dcSids = BaseProducer.GetDomainControllers();
             var domainSid = new SecurityIdentifier(dcSids.First().Key).AccountDomainSid.Value.ToUpper();
-
             var enterpriseDomainControllers = new Group(null)
             {
                 ObjectIdentifier = $"{forestName}-S-1-5-9",
@@ -158,49 +157,49 @@ namespace SharpHound3.Tasks
 
 
 
-            ////Write objects for common principals
-            //foreach (var seen in SeenCommonPrincipals)
-            //{
-            //    var domain = seen.Key;
-            //    var sid = seen.Value;
+            //Write objects for common principals
+            foreach (var seen in SeenCommonPrincipals)
+            {
+                var domain = seen.Key;
+                var sid = seen.Value;
 
-            //    CommonPrincipal.GetCommonSid(sid, out var principal);
+                CommonPrincipal.GetCommonSid(sid, out var principal);
 
-            //    sid = Helpers.ConvertCommonSid(sid, domain);
-            //    switch (principal.Type)
-            //    {
-            //        case LdapTypeEnum.User:
-            //            var u = new User(null)
-            //            {
-            //                ObjectIdentifier = sid
-            //            };
-            //            u.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
-            //            u.Properties.Add("domain", domain);
-            //            _userOutput.Value.WriteObject(u);
-            //            break;
-            //        case LdapTypeEnum.Computer:
-            //            var c = new Computer(null)
-            //            {
-            //                ObjectIdentifier = sid
-            //            };
+                sid = Helpers.ConvertCommonSid(sid, domain);
+                switch (principal.Type)
+                {
+                    case LdapTypeEnum.User:
+                        var u = new User(null)
+                        {
+                            ObjectIdentifier = sid
+                        };
+                        u.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                        u.Properties.Add("domain", domain);
+                        _userOutput.Value.WriteObject(u);
+                        break;
+                    case LdapTypeEnum.Computer:
+                        var c = new Computer(null)
+                        {
+                            ObjectIdentifier = sid
+                        };
 
-            //            c.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
-            //            c.Properties.Add("domain", domain);
-            //            _computerOutput.Value.WriteObject(c);
-            //            break;
-            //        case LdapTypeEnum.Group:
-            //            var g = new Group(null)
-            //            {
-            //                ObjectIdentifier = sid
-            //            };
-            //            g.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
-            //            g.Properties.Add("domain", domain);
-            //            _groupOutput.Value.WriteObject(g);
-            //            break;
-            //        default:
-            //            throw new ArgumentOutOfRangeException();
-            //    }
-            //}
+                        c.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                        c.Properties.Add("domain", domain);
+                        _computerOutput.Value.WriteObject(c);
+                        break;
+                    case LdapTypeEnum.Group:
+                        var g = new Group(null)
+                        {
+                            ObjectIdentifier = sid
+                        };
+                        g.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                        g.Properties.Add("domain", domain);
+                        _groupOutput.Value.WriteObject(g);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
             _runTimer.Stop();
             _statusTimer.Stop();

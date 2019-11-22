@@ -96,7 +96,7 @@ namespace SharpHound3.Tasks
                 {
                     ComputerName = computer.DisplayName,
                     Status = "Success",
-                    Task = $"GetNetLocaGroup-{rid}"
+                    Task = $"GetNetLocalGroup-{rid}"
                 });
 
             //Take our pointers to sids and convert them into string sids for matching
@@ -110,7 +110,7 @@ namespace SharpHound3.Tasks
                 }
                 catch
                 {
-                    // ignored
+                    //SID Resolution failed for some reason, so ignore it
                 }
                 finally
                 {
@@ -123,19 +123,13 @@ namespace SharpHound3.Tasks
 
             //Extract the domain SID from the computer's sid, to avoid creating more SecurityIdentifier objects
             var domainSid = computer.ObjectIdentifier.Substring(0, computer.ObjectIdentifier.LastIndexOf('-'));
-            string machineSid;
-            // The first account in our list should always be the default RID 500 for the machine, but we'll take some extra precautions
-            try
-            {
-                machineSid = convertedSids.First(x => x.EndsWith("-500") && !x.StartsWith(domainSid));
-            }
-            catch
-            {
-                machineSid = "DUMMYSTRING";
-            }
 
+            // The first account in our list should always be the default RID 500 for the machine, but we'll take some extra precautions
+            var machineSid = convertedSids.DefaultIfEmpty("DUMMYSTRING").FirstOrDefault(x => x.EndsWith("-500") && !x.StartsWith(domainSid)) ?? "DUMMYSTRING";
+            
             foreach (var sid in convertedSids)
             {
+                //Filter out local accounts
                 if (sid.StartsWith(machineSid))
                     continue;
 
@@ -143,7 +137,7 @@ namespace SharpHound3.Tasks
                 var finalSid = sid;
                 if (CommonPrincipal.GetCommonSid(finalSid, out var common))
                 {
-                    finalSid = Helpers.ConvertCommonSid(sid, null);
+                    finalSid = Helpers.ConvertCommonSid(sid, computer.Domain);
                     type = common.Type;
                 }
                 else
