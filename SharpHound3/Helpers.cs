@@ -72,7 +72,9 @@ namespace SharpHound3
 
         internal static string ConvertSidToHexSid(string sid)
         {
-            var securityIdentifier = new SecurityIdentifier(sid);
+            var securityIdentifier = CreateSecurityIdentifier(sid);
+            if (securityIdentifier == null)
+                return null;
             var sidBytes = new byte[securityIdentifier.BinaryLength];
             securityIdentifier.GetBinaryForm(sidBytes, 0);
 
@@ -86,6 +88,20 @@ namespace SharpHound3
                 StringComparison.CurrentCultureIgnoreCase));
             temp = DCReplaceRegex.Replace(temp, "").Replace(",", ".").ToUpper();
             return temp;
+        }
+
+        internal static SecurityIdentifier CreateSecurityIdentifier(string sid)
+        {
+            try
+            {
+                return new SecurityIdentifier(sid);
+            }
+            catch (ArgumentException e)
+            {
+                Console.WriteLine(e.StackTrace);
+                Console.WriteLine($"Failed to create SID from {sid}. Please report this to the developer");
+                return null;
+            }
         }
 
         internal static string GetForestName(string domain=null)
@@ -783,7 +799,9 @@ namespace SharpHound3
             var referencedDomain = new StringBuilder();
             var domainLength = (uint)referencedDomain.Capacity;
 
-            var securityIdentifier = new SecurityIdentifier(sid);
+            var securityIdentifier = CreateSecurityIdentifier(sid);
+            if (securityIdentifier == null)
+                return LdapTypeEnum.Unknown;
             var sidBytes = new byte[securityIdentifier.BinaryLength];
             securityIdentifier.GetBinaryForm(sidBytes, 0);
 
@@ -892,7 +910,9 @@ namespace SharpHound3
             var referencedDomain = new StringBuilder();
             var domainLength = (uint)referencedDomain.Capacity;
 
-            var securityIdentifier = new SecurityIdentifier(sid);
+            var securityIdentifier = CreateSecurityIdentifier(sid);
+            if (securityIdentifier == null)
+                return null;
             var sidBytes = new byte[securityIdentifier.BinaryLength];
             securityIdentifier.GetBinaryForm(sidBytes, 0);
 
