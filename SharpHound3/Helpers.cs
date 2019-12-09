@@ -92,9 +92,16 @@ namespace SharpHound3
 
         internal static SecurityIdentifier CreateSecurityIdentifier(string sid)
         {
+            
+            return new SecurityIdentifier(sid);
+            
+        }
+
+        internal static SecurityIdentifier CreateSecurityIdentifier(byte[] sid)
+        {
             try
             {
-                return new SecurityIdentifier(sid);
+                return new SecurityIdentifier(sid, 0);
             }
             catch (ArgumentException e)
             {
@@ -372,12 +379,12 @@ namespace SharpHound3
                 if (sid == "S-1-5-9")
                 {
                     var forest = GetForestName(domain);
-                    OutputTasks.SeenCommonPrincipals.TryAdd(forest, sid);
                     return $"{forest}-{sid}".ToUpper();
                 }
 
                 var nDomain = NormalizeDomainName(domain);
-                OutputTasks.SeenCommonPrincipals.TryAdd(nDomain, sid);
+                if (sid != "S-1-1-0" && sid != "S-1-5-11")
+                    OutputTasks.SeenCommonPrincipals.TryAdd(nDomain, sid);
                 return $"{nDomain}-{sid}";
             }
 

@@ -34,7 +34,8 @@ namespace SharpHound3.Tasks
             var trusts = searcher.QueryLdap("(objectclass=trusteddomain)", LookupProps, SearchScope.Subtree).Select(
                 trustedDomain =>
                 {
-                    var targetSid = trustedDomain.GetSid();
+                    var targetSidBytes = trustedDomain.GetPropertyAsBytes("securityIdentifier");
+                    var targetSid = Helpers.CreateSecurityIdentifier(targetSidBytes)?.Value;
                     if (targetSid == null)
                         return null;
                     var trustDirection = (TrustDirection)int.Parse(trustedDomain.GetProperty("trustdirection"));

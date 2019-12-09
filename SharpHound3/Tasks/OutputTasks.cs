@@ -118,7 +118,6 @@ namespace SharpHound3.Tasks
 
             _groupOutput.Value.WriteObject(enterpriseDomainControllers);
 
-
             var members = new[]
             {
                 new GenericMember
@@ -154,8 +153,6 @@ namespace SharpHound3.Tasks
             authUsers.Properties.Add("name", $"AUTHENTICATED USERS@{domainName}");
 
             _groupOutput.Value.WriteObject(authUsers);
-
-
 
             //Write objects for common principals
             foreach (var seen in SeenCommonPrincipals)
