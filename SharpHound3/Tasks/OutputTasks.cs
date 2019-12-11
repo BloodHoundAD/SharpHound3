@@ -91,35 +91,52 @@ namespace SharpHound3.Tasks
 
         internal static async Task CompleteOutput()
         {
-            PrintStatus();
-            Console.WriteLine($"Enumeration finished in {_runTimer.Elapsed}");
-
-            if (Options.Instance.DumpComputerStatus)
+            try
             {
-                CompleteComputerStatusOutput();
-                await _computerStatusTask;
-            }
+                PrintStatus();
+                Console.WriteLine($"Enumeration finished in {_runTimer.Elapsed}");
 
-            var domainName = Helpers.NormalizeDomainName(Options.Instance.Domain);
-            var forestName = Helpers.GetForestName(domainName).ToUpper();
-            var dcSids = BaseProducer.GetDomainControllers();
-            var domainSid = new SecurityIdentifier(dcSids.First().Key).AccountDomainSid.Value.ToUpper();
-            var enterpriseDomainControllers = new Group(null)
-            {
-                ObjectIdentifier = $"{forestName}-S-1-5-9",
-                Domain = forestName,
-                Members = BaseProducer.GetDomainControllers().Keys.Select(sid => new GenericMember
+                if (Options.Instance.DumpComputerStatus)
                 {
-                    MemberId = sid, MemberType = LdapTypeEnum.Computer
-                }).ToArray()
-            };
+                    CompleteComputerStatusOutput();
+                    await _computerStatusTask;
+                }
+                string domainName;
+                string forestName;
+                try
+                {
+                    domainName = Helpers.NormalizeDomainName(Options.Instance.Domain);
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error resolving domain name in CompleteOutput:OutputTasks.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                    return;
+                }
+                try
+                {
+                    forestName = Helpers.GetForestName(domainName).ToUpper();
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error resolving forest name in CompleteOutput:OutputTasks.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                }
+                var dcSids = BaseProducer.GetDomainControllers();
+                var domainSid = new SecurityIdentifier(dcSids.First().Key).AccountDomainSid.Value.ToUpper();
+                var enterpriseDomainControllers = new Group(null)
+                {
+                    ObjectIdentifier = $"{forestName}-S-1-5-9",
+                    Domain = forestName,
+                    Members = BaseProducer.GetDomainControllers().Keys.Select(sid => new GenericMember
+                    {
+                        MemberId = sid,
+                        MemberType = LdapTypeEnum.Computer
+                    }).ToArray()
+                };
 
-            enterpriseDomainControllers.Properties.Add("name", $"ENTERPRISE DOMAIN CONTROLLERS@{forestName}");
+                enterpriseDomainControllers.Properties.Add("name", $"ENTERPRISE DOMAIN CONTROLLERS@{forestName}");
 
-            _groupOutput.Value.WriteObject(enterpriseDomainControllers);
+                _groupOutput.Value.WriteObject(enterpriseDomainControllers);
 
-            var members = new[]
-            {
+                var members = new[]
+                {
                 new GenericMember
                 {
                     MemberType = LdapTypeEnum.Group,
@@ -132,163 +149,197 @@ namespace SharpHound3.Tasks
                 }
             };
 
-            var everyone = new Group(null)
-            {
-                ObjectIdentifier = $"{domainName}-S-1-1-0",
-                Domain = domainName,
-                Members = members
-            };
-
-            everyone.Properties.Add("name", $"EVERYONE@{domainName}");
-
-            _groupOutput.Value.WriteObject(everyone);
-
-            var authUsers = new Group(null)
-            {
-                ObjectIdentifier = $"{domainName}-S-1-5-11",
-                Domain = domainName,
-                Members = members
-            };
-
-            authUsers.Properties.Add("name", $"AUTHENTICATED USERS@{domainName}");
-
-            _groupOutput.Value.WriteObject(authUsers);
-
-            //Write objects for common principals
-            foreach (var seen in SeenCommonPrincipals)
-            {
-                var domain = seen.Key;
-                var sid = seen.Value;
-
-                CommonPrincipal.GetCommonSid(sid, out var principal);
-
-                sid = Helpers.ConvertCommonSid(sid, domain);
-                switch (principal.Type)
+                var everyone = new Group(null)
                 {
-                    case LdapTypeEnum.User:
-                        var u = new User(null)
-                        {
-                            ObjectIdentifier = sid
-                        };
-                        u.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
-                        u.Properties.Add("domain", domain);
-                        _userOutput.Value.WriteObject(u);
-                        break;
-                    case LdapTypeEnum.Computer:
-                        var c = new Computer(null)
-                        {
-                            ObjectIdentifier = sid
-                        };
+                    ObjectIdentifier = $"{domainName}-S-1-1-0",
+                    Domain = domainName,
+                    Members = members
+                };
 
-                        c.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
-                        c.Properties.Add("domain", domain);
-                        _computerOutput.Value.WriteObject(c);
-                        break;
-                    case LdapTypeEnum.Group:
-                        var g = new Group(null)
-                        {
-                            ObjectIdentifier = sid
-                        };
-                        g.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
-                        g.Properties.Add("domain", domain);
-                        _groupOutput.Value.WriteObject(g);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
+                everyone.Properties.Add("name", $"EVERYONE@{domainName}");
 
-            _runTimer.Stop();
-            _statusTimer.Stop();
-            if (_userOutput.IsValueCreated)
-                _userOutput.Value.CloseWriter();
-            if (_computerOutput.IsValueCreated)
-                _computerOutput.Value.CloseWriter();
-            if (_groupOutput.IsValueCreated)
-                _groupOutput.Value.CloseWriter();
-            if (_domainOutput.IsValueCreated)
-                _domainOutput.Value.CloseWriter();
-            if (_gpoOutput.IsValueCreated)
-                _gpoOutput.Value.CloseWriter();
-            if (_ouOutput.IsValueCreated)
-                _ouOutput.Value.CloseWriter();
+                _groupOutput.Value.WriteObject(everyone);
 
-            _userOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
-            _groupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
-            _computerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
-            _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
-            _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
-            _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
-            
-            string finalName;
-            var options = Options.Instance;
-
-            if (options.NoZip || options.NoOutput)
-                return;
-
-            if (options.ZipFilename != null)
-                finalName = Helpers.ResolveFileName(Options.Instance.ZipFilename, "zip", true);
-            else
-            {
-                finalName = Helpers.ResolveFileName("BloodHound", "zip", true);
-            }
-
-            Console.WriteLine($"Compressing data to {finalName}");
-
-            var buffer = new byte[4096];
-
-            if (File.Exists(finalName))
-            {
-                Console.WriteLine("Zip File already exists, randomizing filename");
-                finalName = Helpers.ResolveFileName(Path.GetRandomFileName(), "zip", true);
-                Console.WriteLine($"New filename is {finalName}");
-            }
-
-            using (var zipStream = new ZipOutputStream(File.Create(finalName)))
-            {
-                //Set level to 9, maximum compressions
-                zipStream.SetLevel(9);
-
-                if (options.EncryptZip)
+                var authUsers = new Group(null)
                 {
-                    if (!options.Loop)
+                    ObjectIdentifier = $"{domainName}-S-1-5-11",
+                    Domain = domainName,
+                    Members = members
+                };
+
+                authUsers.Properties.Add("name", $"AUTHENTICATED USERS@{domainName}");
+
+                _groupOutput.Value.WriteObject(authUsers);
+
+                //Write objects for common principals
+                foreach (var seen in SeenCommonPrincipals)
+                {
+                    try
                     {
-                        var password = ZipPasswords.Value;
-                        zipStream.Password = password;
+                        var domain = seen.Key;
+                        var sid = seen.Value;
 
-                        Console.WriteLine($"Password for Zip file is {password}. Unzip files manually to upload to interface");
+                        CommonPrincipal.GetCommonSid(sid, out var principal);
+
+                        sid = Helpers.ConvertCommonSid(sid, domain);
+                        switch (principal.Type)
+                        {
+                            case LdapTypeEnum.User:
+                                try
+                                {
+                                    var u = new User(null)
+                                    {
+                                        ObjectIdentifier = sid
+                                    };
+                                    u.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                                    u.Properties.Add("domain", domain);
+                                    _userOutput.Value.WriteObject(u);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine("[X] An error occurred while writing to the Users JSON file: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                                }
+                                break;
+                            case LdapTypeEnum.Computer:
+                                try
+                                {
+                                    var c = new Computer(null)
+                                    {
+                                        ObjectIdentifier = sid
+                                    };
+
+                                    c.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                                    c.Properties.Add("domain", domain);
+                                    _computerOutput.Value.WriteObject(c);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine("[X] An error occurred while writing to the Computers JSON file: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                                }
+                                break;
+                            case LdapTypeEnum.Group:
+                                try
+                                {
+                                    var g = new Group(null)
+                                    {
+                                        ObjectIdentifier = sid
+                                    };
+                                    g.Properties.Add("name", $"{principal.Name}@{domain}".ToUpper());
+                                    g.Properties.Add("domain", domain);
+                                    _groupOutput.Value.WriteObject(g);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine("[X] An error occurred while writing to the Groups JSON file: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                                }
+                                break;
+                            default:
+                                throw new ArgumentOutOfRangeException();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("[X] An unexpected error occurred while iterating through SeenCommonPrincipals (OutputTasks.cs):\n\t{0}\n\t{1}",
+                                          ex.Message,
+                                          ex.StackTrace);
                     }
                 }
+
+                _runTimer.Stop();
+                _statusTimer.Stop();
+                if (_userOutput.IsValueCreated)
+                    _userOutput.Value.CloseWriter();
+                if (_computerOutput.IsValueCreated)
+                    _computerOutput.Value.CloseWriter();
+                if (_groupOutput.IsValueCreated)
+                    _groupOutput.Value.CloseWriter();
+                if (_domainOutput.IsValueCreated)
+                    _domainOutput.Value.CloseWriter();
+                if (_gpoOutput.IsValueCreated)
+                    _gpoOutput.Value.CloseWriter();
+                if (_ouOutput.IsValueCreated)
+                    _ouOutput.Value.CloseWriter();
+
+                _userOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
+                _groupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
+                _computerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
+                _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
+                _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
+                _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
+
+                string finalName;
+                var options = Options.Instance;
+
+                if (options.NoZip || options.NoOutput)
+                    return;
+
+                if (options.ZipFilename != null)
+                    finalName = Helpers.ResolveFileName(Options.Instance.ZipFilename, "zip", true);
                 else
                 {
-                    Console.WriteLine("You can upload this file directly to the UI");
+                    finalName = Helpers.ResolveFileName("BloodHound", "zip", true);
                 }
 
-                foreach (var file in UsedFileNames)
-                {
-                    var entry = new ZipEntry(Path.GetFileName(file)) {DateTime = DateTime.Now};
-                    zipStream.PutNextEntry(entry);
+                Console.WriteLine($"Compressing data to {finalName}");
 
-                    using (var fileStream = File.OpenRead(file))
+                var buffer = new byte[4096];
+
+                if (File.Exists(finalName))
+                {
+                    Console.WriteLine("Zip File already exists, randomizing filename");
+                    finalName = Helpers.ResolveFileName(Path.GetRandomFileName(), "zip", true);
+                    Console.WriteLine($"New filename is {finalName}");
+                }
+
+                using (var zipStream = new ZipOutputStream(File.Create(finalName)))
+                {
+                    //Set level to 9, maximum compressions
+                    zipStream.SetLevel(9);
+
+                    if (options.EncryptZip)
                     {
-                        int source;
-                        do
+                        if (!options.Loop)
                         {
-                            source = await fileStream.ReadAsync(buffer, 0, buffer.Length);
-                            zipStream.Write(buffer, 0, source);
-                        } while (source > 0);
+                            var password = ZipPasswords.Value;
+                            zipStream.Password = password;
+
+                            Console.WriteLine($"Password for Zip file is {password}. Unzip files manually to upload to interface");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("You can upload this file directly to the UI");
                     }
 
-                    File.Delete(file);
+                    foreach (var file in UsedFileNames)
+                    {
+                        var entry = new ZipEntry(Path.GetFileName(file)) { DateTime = DateTime.Now };
+                        zipStream.PutNextEntry(entry);
+
+                        using (var fileStream = File.OpenRead(file))
+                        {
+                            int source;
+                            do
+                            {
+                                source = await fileStream.ReadAsync(buffer, 0, buffer.Length);
+                                zipStream.Write(buffer, 0, source);
+                            } while (source > 0);
+                        }
+
+                        File.Delete(file);
+                    }
+
+                    zipStream.Finish();
                 }
 
-                zipStream.Finish();
+                if (options.Loop)
+                    ZipFileNames.Add(finalName);
+
+                UsedFileNames.Clear();
+            } catch (Exception ex)
+            {
+                Console.WriteLine("[X] Error in CompleteOutput:OutputTasks.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
             }
-
-            if (options.Loop)
-                ZipFileNames.Add(finalName);
-
-            UsedFileNames.Clear();
         }
 
         internal static async Task CollapseLoopZipFiles()

@@ -151,7 +151,14 @@ namespace SharpHound3
                         Helpers.StartNewRun();
                         pipelineCompletionTask = PipelineBuilder.GetLoopPipelineForDomain(Options.Instance.Domain);
                         await pipelineCompletionTask;
-                        await OutputTasks.CompleteOutput();
+                        try
+                        {
+                            await OutputTasks.CompleteOutput();
+                        } catch (Exception ex)
+                        {
+                            Console.WriteLine("[X] Error while awaiting for OutputTasks.CompleteOutput from SharpHound.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                            continue;
+                        }
                         if (!Helpers.GetCancellationToken().IsCancellationRequested)
                         {
                             Console.WriteLine();
