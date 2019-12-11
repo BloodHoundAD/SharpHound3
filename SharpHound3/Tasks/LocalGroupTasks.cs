@@ -126,6 +126,10 @@ namespace SharpHound3.Tasks
 
             // The first account in our list should always be the default RID 500 for the machine, but we'll take some extra precautions
             var machineSid = convertedSids.DefaultIfEmpty("DUMMYSTRING").FirstOrDefault(x => x.EndsWith("-500") && !x.StartsWith(domainSid)) ?? "DUMMYSTRING";
+            if (machineSid.StartsWith("S-1-5-21"))
+            {
+                machineSid = machineSid.Substring(0, machineSid.LastIndexOf('-'));
+            }
             
             foreach (var sid in convertedSids)
             {
