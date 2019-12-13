@@ -101,8 +101,15 @@ namespace SharpHound3.Tasks
                     CompleteComputerStatusOutput();
                     await _computerStatusTask;
                 }
+                Console.WriteLine("[*] Instantiating critical variables...");
                 string domainName;
                 string forestName;
+                string domainSid;
+                Dictionary<string, System.DirectoryServices.Protocols.SearchResultEntry> dcSids;
+                GenericMember[] members;
+                Group everyone;
+                Group enterpriseDomainControllers;
+                Group authUsers;
                 try
                 {
                     domainName = Helpers.NormalizeDomainName(Options.Instance.Domain);
@@ -111,65 +118,116 @@ namespace SharpHound3.Tasks
                     Console.WriteLine("[X] Error resolving domain name in CompleteOutput:OutputTasks.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
                     return;
                 }
+                Console.WriteLine($"Domain Name: {domainName}");
                 try
                 {
                     forestName = Helpers.GetForestName(domainName).ToUpper();
                 } catch (Exception ex)
                 {
                     Console.WriteLine("[X] Error resolving forest name in CompleteOutput:OutputTasks.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                    return;
                 }
-                var dcSids = BaseProducer.GetDomainControllers();
-                var domainSid = new SecurityIdentifier(dcSids.First().Key).AccountDomainSid.Value.ToUpper();
-                var enterpriseDomainControllers = new Group(null)
+                Console.WriteLine($"Forest Name: {forestName}");
+                try
                 {
-                    ObjectIdentifier = $"{forestName}-S-1-5-9",
-                    Domain = forestName,
-                    Members = BaseProducer.GetDomainControllers().Keys.Select(sid => new GenericMember
+                    dcSids = BaseProducer.GetDomainControllers();
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error fetching DC SIDs in CompleteOutput:OutputTasks.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                    return;
+                }
+                try
+                {
+                    domainSid = new SecurityIdentifier(dcSids.First().Key).AccountDomainSid.Value.ToUpper();
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error instantiating the Domain SID in CompleteOutput:OutputTasks.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                    return;
+                }
+                Console.WriteLine($"Domain SID: {domainSid}");
+                try
+                {
+                    enterpriseDomainControllers = new Group(null)
                     {
-                        MemberId = sid,
-                        MemberType = LdapTypeEnum.Computer
-                    }).ToArray()
-                };
-
-                enterpriseDomainControllers.Properties.Add("name", $"ENTERPRISE DOMAIN CONTROLLERS@{forestName}");
-
-                _groupOutput.Value.WriteObject(enterpriseDomainControllers);
-
-                var members = new[]
+                        ObjectIdentifier = $"{forestName}-S-1-5-9",
+                        Domain = forestName,
+                        Members = BaseProducer.GetDomainControllers().Keys.Select(sid => new GenericMember
+                        {
+                            MemberId = sid,
+                            MemberType = LdapTypeEnum.Computer
+                        }).ToArray()
+                    };
+                } catch (Exception ex)
                 {
-                new GenericMember
-                {
-                    MemberType = LdapTypeEnum.Group,
-                    MemberId = $"{domainSid}-515"
-                },
-                new GenericMember
-                {
-                    MemberType = LdapTypeEnum.Group,
-                    MemberId = $"{domainSid}-513"
+                    Console.WriteLine("[X] Error instantiating the Enterprise Domain Controllers Group in CompleteOutput:OutputTasks.cs: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                    return;
                 }
-            };
-
-                var everyone = new Group(null)
+                try
                 {
-                    ObjectIdentifier = $"{domainName}-S-1-1-0",
-                    Domain = domainName,
-                    Members = members
-                };
+                    enterpriseDomainControllers.Properties.Add("name", $"ENTERPRISE DOMAIN CONTROLLERS@{forestName}");
+
+                    _groupOutput.Value.WriteObject(enterpriseDomainControllers);
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error while writing the Enterprise Domain Controllers: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                }
+
+                try
+                {
+                    members = new[]
+                        {
+                        new GenericMember
+                        {
+                            MemberType = LdapTypeEnum.Group,
+                            MemberId = $"{domainSid}-515"
+                        },
+                        new GenericMember
+                        {
+                            MemberType = LdapTypeEnum.Group,
+                            MemberId = $"{domainSid}-513"
+                        }
+                    };
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error while instantiating 'members' array: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                    return;
+                }
+
+                try
+                {
+                    everyone = new Group(null)
+                    {
+                        ObjectIdentifier = $"{domainName}-S-1-1-0",
+                        Domain = domainName,
+                        Members = members
+                    };
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error while instantiating 'everyone' group: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                    return;
+                }
 
                 everyone.Properties.Add("name", $"EVERYONE@{domainName}");
 
                 _groupOutput.Value.WriteObject(everyone);
 
-                var authUsers = new Group(null)
+                try
                 {
-                    ObjectIdentifier = $"{domainName}-S-1-5-11",
-                    Domain = domainName,
-                    Members = members
-                };
+                    authUsers = new Group(null)
+                    {
+                        ObjectIdentifier = $"{domainName}-S-1-5-11",
+                        Domain = domainName,
+                        Members = members
+                    };
 
-                authUsers.Properties.Add("name", $"AUTHENTICATED USERS@{domainName}");
+                    authUsers.Properties.Add("name", $"AUTHENTICATED USERS@{domainName}");
 
-                _groupOutput.Value.WriteObject(authUsers);
+                    _groupOutput.Value.WriteObject(authUsers);
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error while instantiating 'authUsers': {0}\n\t{1}", ex.Message, ex.StackTrace);
+                }
+                Console.WriteLine("[*] Finished instantiating key environment variables.");
 
                 //Write objects for common principals
                 foreach (var seen in SeenCommonPrincipals)
@@ -244,29 +302,42 @@ namespace SharpHound3.Tasks
                                           ex.StackTrace);
                     }
                 }
-
+                Console.WriteLine("[*] Finished writing JSON files.");
                 _runTimer.Stop();
                 _statusTimer.Stop();
-                if (_userOutput.IsValueCreated)
-                    _userOutput.Value.CloseWriter();
-                if (_computerOutput.IsValueCreated)
-                    _computerOutput.Value.CloseWriter();
-                if (_groupOutput.IsValueCreated)
-                    _groupOutput.Value.CloseWriter();
-                if (_domainOutput.IsValueCreated)
-                    _domainOutput.Value.CloseWriter();
-                if (_gpoOutput.IsValueCreated)
-                    _gpoOutput.Value.CloseWriter();
-                if (_ouOutput.IsValueCreated)
-                    _ouOutput.Value.CloseWriter();
+                try
+                {
+                    if (_userOutput.IsValueCreated)
+                        _userOutput.Value.CloseWriter();
+                    if (_computerOutput.IsValueCreated)
+                        _computerOutput.Value.CloseWriter();
+                    if (_groupOutput.IsValueCreated)
+                        _groupOutput.Value.CloseWriter();
+                    if (_domainOutput.IsValueCreated)
+                        _domainOutput.Value.CloseWriter();
+                    if (_gpoOutput.IsValueCreated)
+                        _gpoOutput.Value.CloseWriter();
+                    if (_ouOutput.IsValueCreated)
+                        _ouOutput.Value.CloseWriter();
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error while closing LazyJSONWriters: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                }
+                try
+                {
+                    _userOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
+                    _groupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
+                    _computerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
+                    _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
+                    _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
+                    _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("[X] Error while instantiating new LazyJsonFileWriters: {0}\n\t{1}", ex.Message, ex.StackTrace);
+                    return;
+                }
 
-                _userOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
-                _groupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
-                _computerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
-                _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
-                _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
-                _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
-
+                Console.WriteLine("[*] Instantiated file writer objects.");
                 string finalName;
                 var options = Options.Instance;
 
