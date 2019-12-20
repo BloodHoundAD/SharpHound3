@@ -153,6 +153,20 @@ namespace SharpHound3
             return searcher;
         }
 
+        /// <summary>
+        /// Tried to resolve a host to its corresponding AD SID
+        /// Possible formats for hostnames:
+        /// 192.168.1.1 - IP Address
+        /// TESTLAB\primary - NT4 Format
+        /// primary - Raw computer name
+        /// MSSQL/primary - basic SPN
+        /// MSSQL/primary.testlab.local - fully qualified SPN
+        /// MSSQL/primary.testlab.local:1433:instance - SPN with instance and port
+        /// MSSQL/primary.testlab.local:1433 - SPN with port
+        /// </summary>
+        /// <param name="hostname"></param>
+        /// <param name="domain"></param>
+        /// <returns></returns>
         internal static async Task<string> TryResolveHostToSid(string hostname, string domain)
         {
             //Uppercase for consistency
@@ -732,6 +746,28 @@ namespace SharpHound3
             }
         }
 
+        private static async Task<(bool success, WorkstationInfo100 info)> CallNetWkstaGetInfo(string hostname)
+        {
+            var wkstaData = IntPtr.Zero;
+            var netWkstaTask = Task.Run(() => NetWkstaGetInfo(hostname, 100, out wkstaData));
+            if (await Task.WhenAny(Task.Delay(5000), netWkstaTask) != netWkstaTask)
+                return (false, new WorkstationInfo100());
+
+            if (netWkstaTask.Result != 0)
+                return (false, new WorkstationInfo100());
+
+            try
+            {
+                var wkstaInfo = Marshal.PtrToStructure<WorkstationInfo100>(wkstaData);
+                return (true, wkstaInfo);
+            }
+            finally
+            {
+                if (wkstaData != IntPtr.Zero)
+                    NetApiBufferFree(wkstaData);
+            }
+        } 
+
         private static bool CallNetWkstaGetInfo(string hostname, out WorkstationInfo100 wkstaInfo)
         {
             var wkstaData = IntPtr.Zero;
@@ -761,13 +797,8 @@ namespace SharpHound3
 
         internal static async Task<LdapTypeEnum> LookupSidType(string sid)
         {
-            if (CommonPrincipal.GetCommonSid(sid, out var principal))
-                return principal.Type;
-
             if (Cache.Instance.GetSidType(sid, out var type))
                 return type;
-
-            Console.WriteLine(sid);
 
             if (Options.Instance.DomainController != null)
             {

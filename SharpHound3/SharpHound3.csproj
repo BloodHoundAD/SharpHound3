@@ -9,7 +9,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>SharpHound3</RootNamespace>
     <AssemblyName>SharpHound</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
@@ -98,6 +98,7 @@
     <Compile Include="Producers\BaseProducer.cs" />
     <Compile Include="Producers\ComputerFileProducer.cs" />
     <Compile Include="Producers\StealthProducer.cs" />
+    <Compile Include="ResolutionHelpers.cs" />
     <Compile Include="SharpHound.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="DirectorySearch.cs" />

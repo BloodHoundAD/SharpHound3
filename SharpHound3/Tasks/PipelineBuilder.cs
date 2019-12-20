@@ -302,5 +302,6 @@ namespace SharpHound3.Tasks
             producer.StartProducer(findTypeBlock);
             return outputBlock.Completion;
         }
+
     }
 }
