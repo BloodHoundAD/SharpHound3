@@ -7,14 +7,69 @@ using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using SharpHound3.Enums;
+using SharpHound3.JSON;
 
 namespace SharpHound3
 {
     internal class ResolutionHelpers
     {
         private static readonly ConcurrentDictionary<string, string> SidToDomainNameCache = new ConcurrentDictionary<string, string>();
+        private static readonly Cache AppCache = Cache.Instance;
+        internal static readonly string[] GroupMembershipLookupProps = { "samaccounttype", "objectsid", "objectclass" };
 
-        internal async Task<(string finalSid, LdapTypeEnum type)> ResolveSidAndGetType(string sid, string domain)
+        internal static async Task<(string sid, LdapTypeEnum type)> ResolveDistinguishedName(string distinguishedName)
+        {
+            //Check cache to see if we have the item in there first.
+            if (AppCache.GetPrincipal(distinguishedName, out var resolved))
+            {
+                return (resolved.ObjectIdentifier, resolved.ObjectType);
+            }
+
+            var domain = Helpers.DistinguishedNameToDomain(distinguishedName);
+
+            if (distinguishedName.Contains("ForeignSecurityPrincipals"))
+            {
+                var sid = distinguishedName.Split(',')[0].Substring(3);
+                
+                if (!sid.Contains("S-1-5")) 
+                    return (null, LdapTypeEnum.Unknown);
+
+                var (finalSid, type) = await ResolveSidAndGetType(sid, domain);
+                AppCache.Add(distinguishedName, new ResolvedPrincipal
+                {
+                    ObjectIdentifier = finalSid,
+                    ObjectType = type
+                });
+
+                return (finalSid, type);
+            }
+
+            var (resolvedSid, resolvedType) = await ResolveDistinguishedNameLdap(distinguishedName);
+            AppCache.Add(distinguishedName, new ResolvedPrincipal
+            {
+                ObjectIdentifier = resolvedSid,
+                ObjectType = resolvedType
+            });
+
+            return (resolvedSid, resolvedType);
+        }
+
+        private static async Task<(string sid, LdapTypeEnum type)> ResolveDistinguishedNameLdap(
+            string distinguishedName)
+        {
+            var domain = Helpers.DistinguishedNameToDomain(distinguishedName);
+            var searcher = Helpers.GetDirectorySearcher(domain);
+
+            var result = await searcher.GetOne("(objectclass=*)", GroupMembershipLookupProps, SearchScope.Base,
+                distinguishedName);
+
+            var sid = result.GetSid();
+            var type = result.GetLdapType();
+
+            return (sid, type);
+        }
+
+        internal static async Task<(string finalSid, LdapTypeEnum type)> ResolveSidAndGetType(string sid, string domain)
         {
             if (sid.Contains("0ACNF"))
                 return (null, LdapTypeEnum.Unknown);
@@ -28,18 +83,20 @@ namespace SharpHound3
             if (Cache.Instance.GetSidType(sid, out var type))
                 return (sid, type);
 
-            type = await LookupSidType(sid);
+            type = await LookupSidType(sid, domain);
+
+            AppCache.Add(sid, type);
             return (sid, type);
         }
 
-        private static async Task<LdapTypeEnum> LookupSidType(string sid)
+        private static async Task<LdapTypeEnum> LookupSidType(string sid, string domain)
         {
             var hexSid = ConvertSidToHexSid(sid);
             if (hexSid == null)
                 return LdapTypeEnum.Unknown;
 
-            var domain = await GetDomainNameFromSid(sid);
-            var searcher = Helpers.GetDirectorySearcher(domain);
+            var resolvedDomain = await GetDomainNameFromSid(sid) ?? domain;
+            var searcher = Helpers.GetDirectorySearcher(resolvedDomain);
 
             var result = await searcher.GetOne($"(objectsid={hexSid})", Helpers.ResolutionProps, SearchScope.Subtree);
 

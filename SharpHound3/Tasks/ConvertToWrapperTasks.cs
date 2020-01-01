@@ -24,10 +24,8 @@ namespace SharpHound3.Tasks
             var objectSid = searchResultEntry.GetSid();
             var objectId = searchResultEntry.GetObjectIdentifier();
             if (objectSid == null && objectId == null)
-            {
                 return null;
-            }
-            
+
             var objectType = LdapTypeEnum.Unknown;
             string objectIdentifier;
 

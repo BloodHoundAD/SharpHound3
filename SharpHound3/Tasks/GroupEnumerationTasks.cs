@@ -90,10 +90,15 @@ namespace SharpHound3.Tasks
 
                 foreach (var groupMemberDistinguishedName in range)
                 {
-                    var member = await TranslateDistinguishedName(groupMemberDistinguishedName);
-                    if (member.MemberId == null) member.MemberId = groupMemberDistinguishedName;
+                    var (sid, type) = await ResolutionHelpers.ResolveDistinguishedName(groupMemberDistinguishedName);
+                    if (sid == null)
+                        sid = groupMemberDistinguishedName;
 
-                    finalMembers.Add(member);
+                    finalMembers.Add(new GenericMember
+                    {
+                        MemberId = sid,
+                        MemberType = type
+                    });
                     count++;
                 }
 
@@ -104,10 +109,15 @@ namespace SharpHound3.Tasks
             {
                 foreach (var groupMemberDistinguishedName in groupMembers)
                 {
-                    var member = await TranslateDistinguishedName(groupMemberDistinguishedName);
-                    if (member.MemberId == null) member.MemberId = groupMemberDistinguishedName;
+                    var (sid, type) = await ResolutionHelpers.ResolveDistinguishedName(groupMemberDistinguishedName);
+                    if (sid == null)
+                        sid = groupMemberDistinguishedName;
 
-                    finalMembers.Add(member);
+                    finalMembers.Add(new GenericMember
+                    {
+                        MemberId = sid,
+                        MemberType = type
+                    });
                 }
             }
 
@@ -158,7 +168,7 @@ namespace SharpHound3.Tasks
             {
                 //If this is an FSP, we extract the SID from the "distinguishedname"
                 var sid = distinguishedName.Split(',')[0].Substring(3);
-                if (distinguishedName.Contains("CN=S-1-5-21"))
+                if (sid.Contains("S-1-5"))
                 {
                     searchResult = await searcher.GetOne($"(objectsid={Helpers.ConvertSidToHexSid(sid)})", LookupProps,
                         SearchScope.Subtree);

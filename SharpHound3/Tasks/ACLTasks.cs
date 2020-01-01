@@ -41,29 +41,18 @@ namespace SharpHound3.Tasks
             var descriptor = new ActiveDirectorySecurity();
             descriptor.SetSecurityDescriptorBinaryForm(ntSecurityDescriptor);
 
-            var ownerSid = ProcessACESID(descriptor.GetOwner(typeof(SecurityIdentifier)).Value);
+            var ownerSid = FilterAceSids(descriptor.GetOwner(typeof(SecurityIdentifier)).Value);
             if (ownerSid != null)
             {
-                if (CommonPrincipal.GetCommonSid(ownerSid, out var commonPrincipal))
+                var (finalSid, type) = await ResolutionHelpers.ResolveSidAndGetType(ownerSid, wrapper.Domain);
+                if (finalSid != null)
                 {
                     aces.Add(new ACL
                     {
-                        PrincipalSID = Helpers.ConvertCommonSid(ownerSid, wrapper.Domain),
+                        PrincipalSID = finalSid,
                         RightName = "Owner",
                         AceType = "",
-                        PrincipalType = commonPrincipal.Type,
-                        IsInherited = false
-                    });
-                }
-                else
-                {
-                    var ownerType = await Helpers.LookupSidType(ownerSid);
-                    aces.Add(new ACL
-                    {
-                        PrincipalSID = ownerSid,
-                        RightName = "Owner",
-                        AceType = "",
-                        PrincipalType = ownerType,
+                        PrincipalType = type,
                         IsInherited = false
                     });
                 }
@@ -83,21 +72,12 @@ namespace SharpHound3.Tasks
                 if (!IsAceInherited(ace, BaseGuids[wrapper.GetType()]))
                     continue;
 
-                var principalSid = ProcessACESID(ace.IdentityReference.Value);
+                var principalSid = FilterAceSids(ace.IdentityReference.Value);
 
                 if (principalSid == null)
                     continue;
 
-                LdapTypeEnum principalType;
-                if (CommonPrincipal.GetCommonSid(principalSid, out var commonPrincipal))
-                {
-                    principalSid = Helpers.ConvertCommonSid(principalSid, wrapper.Domain);
-                    principalType = commonPrincipal.Type;
-                }
-                else
-                {
-                    principalType = await Helpers.LookupSidType(principalSid);
-                }
+                var (finalSid, type) = await ResolutionHelpers.ResolveSidAndGetType(principalSid, wrapper.Domain);
 
                 var rights = ace.ActiveDirectoryRights;
                 var objectAceType = ace.ObjectType.ToString();
@@ -109,10 +89,10 @@ namespace SharpHound3.Tasks
                     {
                         aces.Add(new ACL
                         {
-                            PrincipalSID = principalSid,
+                            PrincipalSID = finalSid,
                             RightName = "GenericAll",
                             AceType = "",
-                            PrincipalType = principalType,
+                            PrincipalType = type,
                             IsInherited = isInherited
                         });
                     }
@@ -125,10 +105,10 @@ namespace SharpHound3.Tasks
                 {
                     aces.Add(new ACL
                     {
-                        PrincipalSID = principalSid,
+                        PrincipalSID = finalSid,
                         AceType = "",
                         RightName = "WriteDacl",
-                        PrincipalType = principalType,
+                        PrincipalType = type,
                         IsInherited = isInherited
                     });
                 }
@@ -139,8 +119,8 @@ namespace SharpHound3.Tasks
                     {
                         RightName = "WriteOwner",
                         AceType = "",
-                        PrincipalSID = principalSid,
-                        PrincipalType = principalType,
+                        PrincipalSID = finalSid,
+                        PrincipalType = type,
                         IsInherited = isInherited
                     });
                 }
@@ -158,8 +138,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "GetChanges",
                                     RightName = "ExtendedRight",
-                                    PrincipalSID = principalSid,
-                                    PrincipalType = principalType,
+                                    PrincipalSID = finalSid,
+                                    PrincipalType = type,
                                     IsInherited = isInherited
                                 });
                                 break;
@@ -168,8 +148,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "GetChangesAll",
                                     RightName = "ExtendedRight",
-                                    PrincipalSID = principalSid,
-                                    PrincipalType = principalType,
+                                    PrincipalSID = finalSid,
+                                    PrincipalType = type,
                                     IsInherited = isInherited
                                 });
                                 break;
@@ -179,8 +159,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "All",
                                     RightName = "ExtendedRight",
-                                    PrincipalSID = principalSid,
-                                    PrincipalType = principalType,
+                                    PrincipalSID = finalSid,
+                                    PrincipalType = type,
                                     IsInherited = isInherited
                                 });
                                 break;
@@ -193,9 +173,9 @@ namespace SharpHound3.Tasks
                                 aces.Add(new ACL
                                 {
                                     AceType = "User-Force-Change-Password",
-                                    PrincipalSID = principalSid,
+                                    PrincipalSID = finalSid,
                                     RightName = "ExtendedRight",
-                                    PrincipalType = principalType,
+                                    PrincipalType = type,
                                     IsInherited = isInherited
                                 });
                                 break;
@@ -204,9 +184,9 @@ namespace SharpHound3.Tasks
                                 aces.Add(new ACL
                                 {
                                     AceType = "All",
-                                    PrincipalSID = principalSid,
+                                    PrincipalSID = finalSid,
                                     RightName = "ExtendedRight",
-                                    PrincipalType = principalType,
+                                    PrincipalType = type,
                                     IsInherited = isInherited
                                 });
                                 break;
@@ -222,8 +202,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "All",
                                     RightName = "ExtendedRight",
-                                    PrincipalSID = principalSid,
-                                    PrincipalType = principalType,
+                                    PrincipalSID = finalSid,
+                                    PrincipalType = type,
                                     IsInherited = isInherited
                                 });
                             }else if (mappedGuid != null && mappedGuid == "ms-Mcs-AdmPwd")
@@ -232,8 +212,8 @@ namespace SharpHound3.Tasks
                                 {
                                     AceType = "",
                                     RightName = "ReadLAPSPassword",
-                                    PrincipalSID = principalSid,
-                                    PrincipalType = principalType,
+                                    PrincipalSID = finalSid,
+                                    PrincipalType = type,
                                     IsInherited = isInherited
                                 });
                             }
@@ -252,8 +232,8 @@ namespace SharpHound3.Tasks
                         {
                             AceType = "",
                             RightName = "GenericWrite",
-                            PrincipalSID = principalSid,
-                            PrincipalType = principalType,
+                            PrincipalSID = finalSid,
+                            PrincipalType = type,
                             IsInherited = isInherited
                         });
                     }
@@ -266,8 +246,8 @@ namespace SharpHound3.Tasks
                             {
                                 AceType = "WriteSPN",
                                 RightName = "WriteProperty",
-                                PrincipalSID = principalSid,
-                                PrincipalType = principalType,
+                                PrincipalSID = finalSid,
+                                PrincipalType = type,
                                 IsInherited = isInherited
                             });
                         }
@@ -279,8 +259,8 @@ namespace SharpHound3.Tasks
                             {
                                 AceType = "AddMember",
                                 RightName = "WriteProperty",
-                                PrincipalSID = principalSid,
-                                PrincipalType = principalType,
+                                PrincipalSID = finalSid,
+                                PrincipalType = type,
                                 IsInherited = isInherited
                             });
                         }
@@ -292,8 +272,8 @@ namespace SharpHound3.Tasks
                             {
                                 AceType = "AllowedToAct",
                                 RightName = "WriteProperty",
-                                PrincipalSID = principalSid,
-                                PrincipalType = principalType,
+                                PrincipalSID = finalSid,
+                                PrincipalType = type,
                                 IsInherited = isInherited
                             });
                         }
@@ -338,7 +318,7 @@ namespace SharpHound3.Tasks
         /// <param name="sid"></param>
         /// <param name="objectDomain"></param>
         /// <returns></returns>
-        private static string ProcessACESID(string sid)
+        private static string FilterAceSids(string sid)
         { 
             //Ignore Local System/Creator Owner/Principal Self
             if (sid == "S-1-5-18" || sid == "S-1-3-0" || sid == "S-1-5-10")
