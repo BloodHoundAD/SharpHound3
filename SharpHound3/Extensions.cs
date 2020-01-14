@@ -135,11 +135,11 @@ namespace SharpHound3
         /// <returns></returns>
         public static LdapTypeEnum GetLdapType(this SearchResultEntry searchResultEntry)
         {
-            var objectSid = searchResultEntry.GetSid();
-            if (objectSid == null)
+            var objectId = searchResultEntry.GetObjectIdentifier();
+            if (objectId == null)
                 return LdapTypeEnum.Unknown;
 
-            if (CommonPrincipal.GetCommonSid(objectSid, out var commonPrincipal))
+            if (CommonPrincipal.GetCommonSid(objectId, out var commonPrincipal))
                 return commonPrincipal.Type;
 
             var objectType = LdapTypeEnum.Unknown;

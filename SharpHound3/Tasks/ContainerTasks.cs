@@ -72,6 +72,7 @@ namespace SharpHound3.Tasks
                 var type = containedObject.GetLdapType();
 
                 var id = containedObject.GetObjectIdentifier();
+
                 if (id == null)
                     continue;
 
@@ -91,27 +92,31 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            foreach (var containedObject in searcher.QueryLdap("(objectclass=container)", Helpers.ResolutionProps,
+            foreach (var containerObject in searcher.QueryLdap("(objectclass=container)", Helpers.ResolutionProps,
                 SearchScope.OneLevel, domain.DistinguishedName))
             {
-                var type = containedObject.GetLdapType();
-                var id = containedObject.GetObjectIdentifier();
-                if (id == null)
-                    continue;
-
-                switch (type)
+                foreach (var subObject in searcher.QueryLdap("(|(samAccountType=805306368)(samAccountType=805306369))",
+                    Helpers.ResolutionProps, SearchScope.Subtree, containerObject.DistinguishedName))
                 {
-                    case LdapTypeEnum.OU:
-                        ous.Add(id);
-                        break;
-                    case LdapTypeEnum.Computer:
-                        computers.Add(id);
-                        break;
-                    case LdapTypeEnum.User:
-                        users.Add(id);
-                        break;
-                    default:
+                    var type = subObject.GetLdapType();
+                    var id = subObject.GetObjectIdentifier();
+                    if (id == null)
                         continue;
+
+                    switch (type)
+                    {
+                        case LdapTypeEnum.OU:
+                            ous.Add(id);
+                            break;
+                        case LdapTypeEnum.Computer:
+                            computers.Add(id);
+                            break;
+                        case LdapTypeEnum.User:
+                            users.Add(id);
+                            break;
+                        default:
+                            continue;
+                    }
                 }
             }
 
