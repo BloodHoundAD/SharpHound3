@@ -83,6 +83,7 @@ namespace SharpHound3.Tasks
                 var objectAceType = ace.ObjectType.ToString();
                 var isInherited = ace.IsInherited;
 
+                //GenericAll is applicable to everything
                 if (rights.HasFlag(ActiveDirectoryRights.GenericAll))
                 {
                     if (objectAceType == AllGuid || objectAceType == "")
@@ -226,18 +227,21 @@ namespace SharpHound3.Tasks
                 if (rights.HasFlag(ActiveDirectoryRights.GenericWrite) ||
                     rights.HasFlag(ActiveDirectoryRights.WriteProperty))
                 {
-                    if (objectAceType == AllGuid || objectAceType == "")
+                    if (wrapper is User || wrapper is Group || wrapper is Computer || wrapper is GPO)
                     {
-                        aces.Add(new ACL
+                        if (objectAceType == AllGuid || objectAceType == "")
                         {
-                            AceType = "",
-                            RightName = "GenericWrite",
-                            PrincipalSID = finalSid,
-                            PrincipalType = type,
-                            IsInherited = isInherited
-                        });
+                            aces.Add(new ACL
+                            {
+                                AceType = "",
+                                RightName = "GenericWrite",
+                                PrincipalSID = finalSid,
+                                PrincipalType = type,
+                                IsInherited = isInherited
+                            });
+                        }
                     }
-
+                    
                     if (wrapper is User)
                     {
                         if (objectAceType == "f3a64788-5306-11d1-a9c5-0000f80367c1")
