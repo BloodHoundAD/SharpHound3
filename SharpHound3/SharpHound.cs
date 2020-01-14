@@ -72,6 +72,9 @@ namespace SharpHound3
                 return;
             }
 
+            if (options.Domain == null)
+                options.Domain = System.DirectoryServices.ActiveDirectory.Domain.GetCurrentDomain().Name;
+
             var searcher = Helpers.GetDirectorySearcher(options.Domain);
             var result = await searcher.GetOne($"(objectsid={Helpers.ConvertSidToHexSid("S-1-5-32-544")})", new[] {"objectsid"},
                 SearchScope.Subtree);
