@@ -37,7 +37,7 @@ namespace SharpHound3.Tasks
         }
 
         /// <summary>
-        /// Wraps the NetSessionEnum API call with a timeout and parses the 
+        /// Wraps the NetSessionEnum API call with a timeout and parses the results
         /// </summary>
         /// <param name="computer"></param>
         /// <returns></returns>
@@ -130,8 +130,8 @@ namespace SharpHound3.Tasks
                     if (computerName.Equals("[::1]") || computerName.Equals("127.0.0.1"))
                         computerSid = computer.ObjectIdentifier;
 
-                    //Try converting the computer name to a SID
-                    computerSid = computerSid ?? await Helpers.TryResolveHostToSid(computerName, computer.Domain);
+                    //Try converting the computer name to a SID if we didn't already get it from a localhost
+                    computerSid = computerSid ?? await ResolutionHelpers.ResolveHostToSid(computerName, computer.Domain);
 
                     //Try converting the username to a SID
                     var searcher = Helpers.GetDirectorySearcher(computer.Domain);
@@ -149,14 +149,14 @@ namespace SharpHound3.Tasks
                     }
                     else
                     {
-                        var (sidSuccess, userSid) =
-                            await Helpers.AccountNameToSid(sessionUsername, computer.Domain, false);
-                        if (sidSuccess)
+                        var (success, sid, _) =
+                            await ResolutionHelpers.ResolveAccountNameToSidAndType(sessionUsername, computer.Domain);
+                        if (success)
                         {
                             sessionList.Add(new Session
                             {
                                 ComputerId = computerSid,
-                                UserId = userSid
+                                UserId = sid
                             });
                         }
                         else

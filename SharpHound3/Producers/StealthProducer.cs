@@ -107,7 +107,7 @@ namespace SharpHound3.Producers
 
             foreach (var path in paths.Keys)
             {
-                var sid = await Helpers.TryResolveHostToSid(path, DomainName);
+                var sid = await ResolutionHelpers.ResolveHostToSid(path, DomainName);
                 if (sid != null)
                 {
                     var searchResult = await Searcher.GetOne($"(objectsid={Helpers.ConvertSidToHexSid(sid)})", Props,

@@ -41,7 +41,7 @@ namespace SharpHound3.Tasks
                     port = 1433;
                 }
 
-                var hostSid = await Helpers.TryResolveHostToSid(spn, domain);
+                var hostSid = await ResolutionHelpers.ResolveHostToSid(spn, domain);
                 if (hostSid.StartsWith("S-1-5"))
                 {
                    resolved.Add(new SPNTarget

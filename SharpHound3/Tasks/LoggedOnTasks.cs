@@ -64,6 +64,7 @@ namespace SharpHound3.Tasks
                 }
 
                 var taskResult = task.Result;
+                //Check the result of the task. 234 and 0 are both acceptable.
                 if (taskResult != 0 && taskResult != 234)
                 {
                     if (Options.Instance.DumpComputerStatus)
@@ -102,8 +103,8 @@ namespace SharpHound3.Tasks
                     if (username.Trim() == "" || username.EndsWith("$"))
                         continue;
 
-                    var (sidSuccess, sid) = await Helpers.AccountNameToSid(username, domain);
-                    if (sidSuccess)
+                    var (rSuccess, sid, _) = await ResolutionHelpers.ResolveAccountNameToSidAndType(username, domain);
+                    if (rSuccess)
                     {
                         sessionList.Add(new Session
                         {

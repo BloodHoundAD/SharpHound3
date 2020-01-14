@@ -20,6 +20,8 @@ namespace SharpHound3
         [JsonProperty]
         private ConcurrentDictionary<string, LdapTypeEnum> _sidTypeDictionary;
 
+        [JsonProperty] private ConcurrentDictionary<UserDomainKey, ResolvedPrincipal> _resolvedAccountNameDictionary;
+
         [JsonIgnore]
         private readonly Mutex _bhMutex;
 
@@ -40,7 +42,12 @@ namespace SharpHound3
             _bhMutex = new Mutex(false, $"MUTEX:{GetBase64MachineID()}");
         }
 
-        internal bool GetPrincipal(string key, out ResolvedPrincipal value)
+        internal bool GetResolvedAccount(UserDomainKey key, out ResolvedPrincipal value)
+        {
+            return _resolvedAccountNameDictionary.TryGetValue(key, out value);
+        }
+
+        internal bool GetResolvedDistinguishedName(string key, out ResolvedPrincipal value)
         {
             return _resolvedPrincipalDictionary.TryGetValue(key.ToUpper(), out value);
         }
@@ -55,6 +62,11 @@ namespace SharpHound3
             return _sidTypeDictionary.TryGetValue(key.ToUpper(), out type);
         }
 
+        internal void Add(UserDomainKey key, ResolvedPrincipal value)
+        {
+            _resolvedAccountNameDictionary.TryAdd(key, value);
+        }
+        
         internal void Add(string key, ResolvedPrincipal value)
         {
             _resolvedPrincipalDictionary.TryAdd(key.ToUpper(), value);
@@ -77,6 +89,7 @@ namespace SharpHound3
                 _globalCatalogDictionary = new ConcurrentDictionary<string, string[]>();
                 _resolvedPrincipalDictionary = new ConcurrentDictionary<string, ResolvedPrincipal>();
                 _sidTypeDictionary = new ConcurrentDictionary<string, LdapTypeEnum>();
+                _resolvedAccountNameDictionary = new ConcurrentDictionary<UserDomainKey, ResolvedPrincipal>();
                 Console.WriteLine("[-] Cache Invalidated: 0 Objects in Cache");
                 Console.WriteLine();
                 return;
@@ -89,6 +102,7 @@ namespace SharpHound3
                 _globalCatalogDictionary = new ConcurrentDictionary<string, string[]>();
                 _resolvedPrincipalDictionary = new ConcurrentDictionary<string, ResolvedPrincipal>();
                 _sidTypeDictionary = new ConcurrentDictionary<string, LdapTypeEnum>();
+                _resolvedAccountNameDictionary = new ConcurrentDictionary<UserDomainKey, ResolvedPrincipal>();
                 Console.WriteLine("[+] Cache File not Found: 0 Objects in cache");
                 Console.WriteLine();
                 return;
@@ -107,7 +121,6 @@ namespace SharpHound3
             {
                 _bhMutex.ReleaseMutex();
             }
-
         }
 
         private string GetCacheFileName()

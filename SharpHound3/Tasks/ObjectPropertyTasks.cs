@@ -98,7 +98,7 @@ namespace SharpHound3.Tasks
                 // For each computer thats in this array, try and turn it into a SID
                 foreach (var computerName in delegates)
                 {
-                    var resolvedHost = await Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
+                    var resolvedHost = await ResolutionHelpers.ResolveHostToSid(computerName, wrapper.Domain);
                     trustedToAuthComputers.Add(resolvedHost);
                 }
             }
@@ -124,7 +124,7 @@ namespace SharpHound3.Tasks
                     }
                     else
                     {
-                        type = await Helpers.LookupSidType(sid);
+                        type = await ResolutionHelpers.LookupSidType(sid,wrapper.Domain);
                     }
 
                     allowedToActPrincipals.Add(new GenericMember
@@ -231,7 +231,7 @@ namespace SharpHound3.Tasks
                 //Try to resolve each computer to a SID
                 foreach (var computerName in delegates)
                 {
-                    var resolvedHost = await Helpers.TryResolveHostToSid(computerName, wrapper.Domain);
+                    var resolvedHost = await ResolutionHelpers.ResolveHostToSid(computerName, wrapper.Domain);
                     trustedToAuthComputers.Add(resolvedHost);
                 }
             }

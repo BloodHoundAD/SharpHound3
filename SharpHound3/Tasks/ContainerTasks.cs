@@ -49,7 +49,7 @@ namespace SharpHound3.Tasks
                     //If the status is 0, its unenforced, 2 is enforced
                     var enforced = status == "2";
 
-                    var (success, guid) = await Helpers.DistinguishedNameToGuid(distinguishedName);
+                    var (success, guid) = await ResolutionHelpers.OUDistinguishedNameToGuid(distinguishedName);
                     if (success)
                     {
                         resolvedLinks.Add(new GPLink
@@ -148,7 +148,7 @@ namespace SharpHound3.Tasks
                     //If the status is 0, its unenforced, 2 is enforced
                     var enforced = status == "2";
 
-                    var (success, guid) = await Helpers.DistinguishedNameToGuid(distinguishedName);
+                    var (success, guid) = await ResolutionHelpers.OUDistinguishedNameToGuid(distinguishedName);
                     if (success)
                     {
                         resolvedLinks.Add(new GPLink

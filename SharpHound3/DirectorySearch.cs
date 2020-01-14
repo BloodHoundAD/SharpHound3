@@ -231,7 +231,7 @@ namespace SharpHound3
             }
         }
 
-        internal bool GetNameFromGuid(string guid, out string name)
+        internal bool GetAttributeFromGuid(string guid, out string name)
         {
             return _domainGuidMap.TryGetValue(guid, out name);
         }

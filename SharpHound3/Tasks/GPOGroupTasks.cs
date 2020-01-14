@@ -132,7 +132,7 @@ namespace SharpHound3.Tasks
                         continue;
                     }
 
-                    actions.AddRange(await ProcessGPOXml(baseFilePath));
+                    actions.AddRange(await ProcessGPOXml(baseFilePath, gpoDomain));
                     actions.AddRange(await ProcessGPOTmpl(baseFilePath, gpoDomain));
                 }
 
@@ -340,10 +340,10 @@ namespace SharpHound3.Tasks
                                 {
                                     foreach (var member in val.Split(','))
                                     {
-                                        var (success, sid) = await GetSid(member.Trim('*'), gpoDomain);
+
+                                        var (success, sid, type) = await GetSid(member.Trim('*'), gpoDomain);
                                         if (!success)
                                             continue;
-                                        var type = await Helpers.LookupSidType(sid);
                                         actions.Add(new GroupAction
                                         {
                                             Target = GroupActionTarget.RestrictedMember,
@@ -361,25 +361,26 @@ namespace SharpHound3.Tasks
                             var index = key.IndexOf("MemberOf", StringComparison.CurrentCultureIgnoreCase);
                             if (rightMatches.Count > 0 && index > 0)
                             {
-                                var sid = key.Trim('*').Substring(0, index - 3);
-
+                                var sid = key.Trim('*').Substring(0, index - 3).ToUpper();
+                                var type= LdapTypeEnum.Unknown;
                                 if (!sid.StartsWith("S-1-5", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    var (success, aSid) = await Helpers.AccountNameToSid(sid, gpoDomain, false);
+                                    var (success, aSid, lType) = await ResolutionHelpers.ResolveAccountNameToSidAndType(sid, gpoDomain);
                                     if (!success)
                                     {
-                                        (success, aSid) = await Helpers.AccountNameToSid(sid, gpoDomain, true);
+                                        (success, aSid, lType) = await ResolutionHelpers.ResolveAccountNameToSidAndType($"{sid}$", gpoDomain);
                                         sid = !success ? null : aSid;
                                     }
                                     else
                                         sid = aSid;
+
+                                    type = lType;
                                 }
-                                
+
                                 if (sid == null || !sid.StartsWith("S-1-5", StringComparison.OrdinalIgnoreCase))
                                     continue;
 
-                                var type = await Helpers.LookupSidType(sid);
-
+                                
                                 foreach (var match in rightMatches)
                                 {
                                     var rid = int.Parse(ExtractRid.Match(match.ToString()).Groups[1].Value);
@@ -404,7 +405,7 @@ namespace SharpHound3.Tasks
             return actions;
         }
 
-        private static async Task<List<GroupAction>> ProcessGPOXml(string basePath)
+        private static async Task<List<GroupAction>> ProcessGPOXml(string basePath, string gpoDomain)
         {
             var actions = new List<GroupAction>();
             var xmlPath = $"{basePath}\\MACHINE\\Preferences\\Groups\\Groups.xml";
@@ -501,7 +502,7 @@ namespace SharpHound3.Tasks
 
                                 if (!string.IsNullOrEmpty(memberSid))
                                 {
-                                    memberType = await Helpers.LookupSidType(memberSid);
+                                    memberType = await ResolutionHelpers.LookupSidType(memberSid, gpoDomain);
 
                                     actions.Add(new GroupAction
                                     {
@@ -521,19 +522,18 @@ namespace SharpHound3.Tasks
                                         var splitMember = memberName.Split('\\');
                                         memberName = splitMember[1];
                                         var memberDomain = splitMember[0];
-                                        var (success, lookupSid) =
-                                            await Helpers.AccountNameToSid(memberName, memberDomain, false);
+                                        var (success, lookupSid, lType) =
+                                            await ResolutionHelpers.ResolveAccountNameToSidAndType(memberName, memberDomain);
 
 
                                         if (success)
                                         {
-                                            memberType = await Helpers.LookupSidType(lookupSid);
                                             actions.Add(new GroupAction
                                             {
                                                 Action = memberAction,
                                                 Target = GroupActionTarget.LocalGroup,
                                                 TargetSid = lookupSid,
-                                                TargetType = memberType,
+                                                TargetType = lType,
                                                 TargetRid = (LocalGroupRids)targetGroup
                                             });
                                         }
@@ -548,7 +548,7 @@ namespace SharpHound3.Tasks
             return actions;
         }
 
-        private static async Task<(bool success, string sid)> GetSid(string element, string domainName)
+        private static async Task<(bool success, string sid, LdapTypeEnum type)> GetSid(string element, string domainName)
         {
             if (!element.StartsWith("S-1-", StringComparison.CurrentCulture))
             {
@@ -568,23 +568,27 @@ namespace SharpHound3.Tasks
                     user = element;
                 }
 
-                //Try to resolve as a user object first
-                var (success, rSid) = await Helpers.AccountNameToSid(user, domain, false);
+                user = user.ToUpper();
 
+                //Try to resolve as a user object first
+                var (success, sid, type) = await ResolutionHelpers.ResolveAccountNameToSidAndType(user, domain);
+                
                 if (!success)
                 {
                     //Resolution failed, so try as a computer objectnow
-                    (success, rSid) = await Helpers.AccountNameToSid(user, domain, true);
+                    (success, sid, type) = await ResolutionHelpers.ResolveAccountNameToSidAndType($"{user}$", domain);
+
                     //Its not a computer either so just return null
                     if (!success)
-                        return (false, null);
+                        return (false, null, LdapTypeEnum.Unknown);
                 }
 
-                return (true, rSid);
+                return (true, sid, type);
             }
             
             //The element is just a sid, so return it straight
-            return (true, element);
+            var lType = await ResolutionHelpers.LookupSidType(element, domainName);
+            return (true, element, lType);
         }
 
         private class TempStorage

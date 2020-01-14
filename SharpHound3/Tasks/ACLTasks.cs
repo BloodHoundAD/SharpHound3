@@ -193,7 +193,7 @@ namespace SharpHound3.Tasks
                         }
                     }else if (wrapper is Computer)
                     {
-                        Helpers.GetDirectorySearcher(wrapper.Domain).GetNameFromGuid(objectAceType, out var mappedGuid);
+                        Helpers.GetDirectorySearcher(wrapper.Domain).GetAttributeFromGuid(objectAceType, out var mappedGuid);
                         if (wrapper.SearchResult.GetProperty("ms-mcs-admpwdexpirationtime") != null)
                         {
                             if (objectAceType == AllGuid || objectAceType == "")
