@@ -45,5 +45,10 @@ namespace SharpHound3
                 return ((_accountName != null ? _accountName.GetHashCode() : 0) * 397) ^ (_accountDomain != null ? _accountDomain.GetHashCode() : 0);
             }
         }
+
+        public override string ToString()
+        {
+            return $"{AccountDomain}\\{AccountName}";
+        }
     }
 }

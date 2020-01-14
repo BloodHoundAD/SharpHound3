@@ -91,7 +91,7 @@ namespace SharpHound3
             }
             catch (ArgumentException e)
             {
-                Console.WriteLine(e.StackTrace);
+                Console.WriteLine(e.ToString());
                 Console.WriteLine($"Failed to create SID from {sid}. Please report this to the developer");
                 return null;
             }

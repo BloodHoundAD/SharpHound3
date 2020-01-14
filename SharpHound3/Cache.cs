@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
 using Microsoft.Win32;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SharpHound3.Enums;
 
 namespace SharpHound3
@@ -20,7 +22,7 @@ namespace SharpHound3
         [JsonProperty]
         private ConcurrentDictionary<string, LdapTypeEnum> _sidTypeDictionary;
 
-        [JsonProperty] private ConcurrentDictionary<UserDomainKey, ResolvedPrincipal> _resolvedAccountNameDictionary;
+        [JsonProperty][JsonConverter(typeof(AccountCacheConverter))] private ConcurrentDictionary<UserDomainKey, ResolvedPrincipal> _resolvedAccountNameDictionary;
 
         [JsonIgnore]
         private readonly Mutex _bhMutex;
@@ -114,7 +116,7 @@ namespace SharpHound3
                 var bytes = File.ReadAllBytes(fileName);
                 var json = new UTF8Encoding(true).GetString(bytes);
                 CacheInstance = JsonConvert.DeserializeObject<Cache>(json);
-                Console.WriteLine($"[+] Cache File Found! Loaded {CacheInstance._resolvedPrincipalDictionary.Count + CacheInstance._globalCatalogDictionary.Count + CacheInstance._sidTypeDictionary.Count} Objects in cache");
+                Console.WriteLine($"[+] Cache File Found! Loaded {CacheInstance._resolvedPrincipalDictionary.Count + CacheInstance._globalCatalogDictionary.Count + CacheInstance._sidTypeDictionary.Count + CacheInstance._resolvedAccountNameDictionary.Count} Objects in cache");
                 Console.WriteLine();
             }
             finally
@@ -182,5 +184,39 @@ namespace SharpHound3
     {
         public string ObjectIdentifier { get; set; }
         public LdapTypeEnum ObjectType { get; set; }
+    }
+
+    internal class AccountCacheConverter : JsonConverter
+    {
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            IDictionary<UserDomainKey, ResolvedPrincipal> dict = (IDictionary<UserDomainKey, ResolvedPrincipal>)value;
+            JObject obj = new JObject();
+            foreach (var kvp in dict)
+            {
+                obj.Add(kvp.Key.ToString(), JToken.FromObject(kvp.Value));
+            }
+            obj.WriteTo(writer);
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            JObject obj = JObject.Load(reader);
+            IDictionary<UserDomainKey, ResolvedPrincipal> dict = (IDictionary<UserDomainKey, ResolvedPrincipal>)existingValue ?? new ConcurrentDictionary<UserDomainKey, ResolvedPrincipal>();
+            foreach (var prop in obj.Properties())
+            {
+                var key = new UserDomainKey();
+                var split = prop.Name.Split('\\');
+                key.AccountDomain = split[0];
+                key.AccountName = split[1];
+                dict.Add(key, prop.Value.ToObject<ResolvedPrincipal>());
+            }
+            return dict;
+        }
+
+        public override bool CanConvert(Type objectType)
+        {
+            return typeof(IDictionary<UserDomainKey, string>).IsAssignableFrom(objectType);
+        }
     }
 }
