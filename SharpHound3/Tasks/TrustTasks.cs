@@ -35,7 +35,11 @@ namespace SharpHound3.Tasks
                 trustedDomain =>
                 {
                     var targetSidBytes = trustedDomain.GetPropertyAsBytes("securityIdentifier");
+                    if (targetSidBytes == null || targetSidBytes.Length == 0)
+                        return null;
+
                     var targetSid = Helpers.CreateSecurityIdentifier(targetSidBytes)?.Value;
+
                     if (targetSid == null)
                         return null;
                     var trustDirection = (TrustDirection)int.Parse(trustedDomain.GetProperty("trustdirection"));
