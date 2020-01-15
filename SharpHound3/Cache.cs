@@ -11,6 +11,9 @@ using SharpHound3.Enums;
 
 namespace SharpHound3
 {
+    /// <summary>
+    /// Class representing the cache for SharpHound. Greatly speeds up enumeration and is saved to disk by default.
+    /// </summary>
     internal class Cache
     {
         [JsonProperty]
@@ -33,12 +36,18 @@ namespace SharpHound3
         [JsonIgnore]
         private static Cache CacheInstance { get; set; }
 
+        /// <summary>
+        /// Creates a new global Cache Instance
+        /// </summary>
         internal static void CreateInstance()
         {
             CacheInstance = new Cache();
             CacheInstance.LoadCache();
         }
 
+        /// <summary>
+        /// Creates a new Cache object by initializing a global mutex, ensuring multiple SH processes don't clobber each other
+        /// </summary>
         private Cache()
         {
             _bhMutex = new Mutex(false, $"MUTEX:{GetBase64MachineID()}");
@@ -84,8 +93,12 @@ namespace SharpHound3
             _sidTypeDictionary.TryAdd(key, type);
         }
 
+        /// <summary>
+        /// Loads the cache instance from disk
+        /// </summary>
         internal void LoadCache()
         {
+            //Check if the user wants to create a new cache
             if (Options.Instance.InvalidateCache)
             {
                 _globalCatalogDictionary = new ConcurrentDictionary<string, string[]>();
@@ -97,8 +110,10 @@ namespace SharpHound3
                 return;
             }
 
+            //Grab our cache file name
             var fileName = GetCacheFileName();
 
+            //Check if the file exists already. If not, make a brand new cache.
             if (!File.Exists(fileName))
             {
                 _globalCatalogDictionary = new ConcurrentDictionary<string, string[]>();
@@ -112,19 +127,27 @@ namespace SharpHound3
 
             try
             {
+                //Wait for the mutex to release and get a lock.
                 _bhMutex.WaitOne();
                 var bytes = File.ReadAllBytes(fileName);
                 var json = new UTF8Encoding(true).GetString(bytes);
+                //Deserialize the file using JSON.NET
                 CacheInstance = JsonConvert.DeserializeObject<Cache>(json);
+                //Let the user know how many objects are in the cache.
                 Console.WriteLine($"[+] Cache File Found! Loaded {CacheInstance._resolvedPrincipalDictionary.Count + CacheInstance._globalCatalogDictionary.Count + CacheInstance._sidTypeDictionary.Count + CacheInstance._resolvedAccountNameDictionary.Count} Objects in cache");
                 Console.WriteLine();
             }
             finally
             {
+                //Release the mutex
                 _bhMutex.ReleaseMutex();
             }
         }
 
+        /// <summary>
+        /// Gets the filename for the cache file. Defaults to the Base64 of the MachineGuid key in the registry
+        /// </summary>
+        /// <returns></returns>
         private string GetCacheFileName()
         {
             var baseFilename = Options.Instance.CacheFilename ?? $"{GetBase64MachineID()}.bin";
@@ -133,19 +156,24 @@ namespace SharpHound3
             return finalFilename;
         }
 
+        /// <summary>
+        /// Save the cache to disk
+        /// </summary>
         internal void SaveCache()
         {
+            //Check if the user doesn't want to save the cache
             if (Options.Instance.NoSaveCache)
-            {
                 return;
-            }
 
+            //Serialize the cache instance to JSON
             var jsonCache = new UTF8Encoding(true).GetBytes(JsonConvert.SerializeObject(CacheInstance));
             var finalFilename = GetCacheFileName();
 
             try
             {
+                //Wait for the mutex and grab a lock
                 _bhMutex.WaitOne();
+                //Write the cache file
                 using (var stream =
                     new FileStream(finalFilename, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
@@ -154,22 +182,30 @@ namespace SharpHound3
             }
             finally
             {
+                //Release the mutex
                 _bhMutex.ReleaseMutex();
             }
         }
 
+        /// <summary>
+        /// Gets a machine-unique base64 value for the cache file name using the MachineGuid value in the Cryptography registry key
+        /// </summary>
+        /// <returns>Machine-specific Base64 String</returns>
         private static string GetBase64MachineID()
         {
             try
             {
-                using (var key = Registry.LocalMachine.OpenSubKey("SOFTWARE\\Microsoft\\Cryptography"))
+                //Force opening the registry key as the Registry64 view
+                using (var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                 {
-                    if (key == null)
+                    var crypto = key.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography", false);
+                    //Default to the machine name if something fails for some reason
+                    if (crypto == null)
                     {
                         return $"{Helpers.Base64(Environment.MachineName)}";
                     }
 
-                    var guid = key.GetValue("MachineGuid") as string;
+                    var guid = crypto.GetValue("MachineGuid") as string;
                     return Helpers.Base64(guid);
                 }
             }
@@ -180,12 +216,18 @@ namespace SharpHound3
         }
     }
 
+    /// <summary>
+    /// Helper class for storing the cache
+    /// </summary>
     public class ResolvedPrincipal
     {
         public string ObjectIdentifier { get; set; }
         public LdapTypeEnum ObjectType { get; set; }
     }
 
+    /// <summary>
+    /// Helper class to convert the UserDomainKey class to JSON
+    /// </summary>
     internal class AccountCacheConverter : JsonConverter
     {
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
