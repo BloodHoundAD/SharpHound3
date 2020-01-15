@@ -4,19 +4,24 @@ using System.Collections.Generic;
 using System.DirectoryServices.ActiveDirectory;
 using System.DirectoryServices.Protocols;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using SharpHound3.Enums;
 using SearchOption = System.DirectoryServices.Protocols.SearchOption;
 
 namespace SharpHound3
 {
+    /// <summary>
+    /// Class encapsulating LDAP searching
+    /// </summary>
     internal class DirectorySearch
     {
         private readonly string _domainController;
         private readonly string _domainName;
         private readonly Domain _domain;
         private Dictionary<string, string> _domainGuidMap;
-        private bool _isFaulted = false;
+        private bool _isFaulted;
+        //Thread-safe storage for our Ldap Connection Pool
         private readonly ConcurrentBag<LdapConnection> _connectionPool = new ConcurrentBag<LdapConnection>();
 
         public DirectorySearch(string domainName = null, string domainController = null)
@@ -28,16 +33,17 @@ namespace SharpHound3
             CreateSchemaMap();
         }
 
+        //Look up a username in the Global Catalog to get a list of potential domains a session can come from
         internal async Task<string[]> LookupUserInGC(string username)
         {
             if (Cache.Instance.GetGlobalCatalogMatches(username, out var sids))
-            {
                 return sids;
-            }
 
             var connection = GetGlobalCatalogConnection();
+
             try
             {
+                //Create a search request looking for users with the specified samaccountname, only getting back the sid
                 var searchRequest = CreateSearchRequest($"(&(samAccountType=805306368)(samaccountname={username}))",
                     SearchScope.Subtree, new[] { "objectsid" });
 
@@ -70,10 +76,20 @@ namespace SharpHound3
             }
             finally
             {
+                //Always dispose GC connections
                 connection.Dispose();
             }
         }
 
+        /// <summary>
+        /// Get a single LDAP entry for the specified filter
+        /// </summary>
+        /// <param name="ldapFilter">Ldap Filter to search for</param>
+        /// <param name="props">Properties to request</param>
+        /// <param name="scope">Scope to search</param>
+        /// <param name="adsPath">Distinguished name to bind too</param>
+        /// <param name="globalCatalog">Use the global catalog instead of the regular directory</param>
+        /// <returns>The LDAP search result entry for the specified filter or null if nothing was found</returns>
         internal async Task<SearchResultEntry> GetOne(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false)
         {
             var connection = globalCatalog ? GetGlobalCatalogConnection() : GetLdapConnection();
@@ -81,6 +97,7 @@ namespace SharpHound3
             {
                 var searchRequest = CreateSearchRequest(ldapFilter, scope, props, adsPath);
 
+                //Asynchronously send the search request
                 var iAsyncResult = connection.BeginSendRequest(searchRequest,
                     PartialResultProcessing.NoPartialResultSupport, null, null);
 
@@ -89,10 +106,14 @@ namespace SharpHound3
 
                 try
                 {
+                    //Wait for the search request to finish
                     var response = await task;
+
+                    //Check if theres entries
                     if (response.Entries.Count == 0)
                         return null;
 
+                    //Return the first search result entry
                     return response.Entries[0];
                 }
                 catch
@@ -102,6 +123,7 @@ namespace SharpHound3
             }
             finally
             {
+                //Dispose the global catalog connection or add the connection back to the connection pool
                 if (!globalCatalog)
                     _connectionPool.Add(connection);
                 else
@@ -109,6 +131,15 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Performs an LDAP search returning multiple objects/pages
+        /// </summary>
+        /// <param name="ldapFilter"></param>
+        /// <param name="props"></param>
+        /// <param name="scope"></param>
+        /// <param name="adsPath"></param>
+        /// <param name="globalCatalog"></param>
+        /// <returns>An IEnumerable with search results</returns>
         internal IEnumerable<SearchResultEntry> QueryLdap(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false)
         {
             var connection = globalCatalog ? GetGlobalCatalogConnection() :  GetLdapConnection();
@@ -171,49 +202,68 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Use ranged retrieval to grab large attributes (generally the member attribute)
+        /// </summary>
+        /// <param name="distinguishedName">DN of object to retrieve from</param>
+        /// <param name="attribute">Attribute name to retrieve values for</param>
+        /// <returns>List of all values of the attribute</returns>
         internal async Task<List<string>> RangedRetrievalAsync(string distinguishedName, string attribute)
         {
             var connection = GetLdapConnection();
-            var members = new List<string>();
+            var values = new List<string>();
             try
             {
+                //Set up our variables for paging
                 var index = 0;
                 var step = 0;
                 var baseString = $"{attribute}";
                 var currentRange = $"{baseString};range={index}-*";
+                //Example search string: member;range=0-1000
                 var searchDone = false;
 
+                //Create our request and add our range search to the properties attribute. Set the search base to the DN of the object
                 var searchRequest = CreateSearchRequest($"{attribute}=*", SearchScope.Base, new[] { currentRange },
                     distinguishedName);
 
+                //Set up a continuous loop, which ends when we run out of attributes to retrieve
                 while (true)
                 {
+                    //Asynchronously send our search request
                     var iASyncResult = connection.BeginSendRequest(searchRequest,
                         PartialResultProcessing.NoPartialResultSupport, null,null);
                     var task = Task<SearchResponse>.Factory.FromAsync(iASyncResult, x => (SearchResponse)connection.EndSendRequest(x));
+
+                    //Wait for the request to finish
                     var response = await task;
+
                     //There should only be one SearchResultEntry
                     if (response?.Entries.Count == 1)
                     {
                         var entry = response.Entries[0];
+                        //We should only ever have one attribute, since thats all we requested
                         foreach (string attr in entry.Attributes.AttributeNames)
                         {
+                            //Set our current range to the attribute name
                             currentRange = attr;
+                            //Check if the string has the * character in it. If it does, we've reached the end of our search
                             searchDone = currentRange.IndexOf("*", 0, StringComparison.Ordinal) > 0;
+                            //Set our step to the number of attributes that came back
                             step = entry.Attributes[currentRange].Count;
                         }
 
+                        // Grab all the values of the attribute
                         foreach (string member in entry.Attributes[currentRange].GetValues(typeof(string)))
                         {
-                            members.Add(member);
+                            values.Add(member);
                             index++;
                         }
 
+                        //If we're done, return the values and exit the loop
                         if (searchDone)
-                        {
-                            return members;
-                        }
+                            return values;
 
+                        // Theres more to retrieve, so update our search string, and then do the search again to get the next range
                         currentRange = $"{baseString};range={index}-{index + step}";
 
                         searchRequest.Attributes.Clear();
@@ -221,21 +271,32 @@ namespace SharpHound3
                     }
                     else
                     {
-                        return members;
+                        return values;
                     }
                 }
             }
             finally
             {
+                //Add the ldap connection back to the pool
                 _connectionPool.Add(connection);
             }
         }
 
+        /// <summary>
+        /// Get the name of a schema attribute by its GUID
+        /// </summary>
+        /// <param name="guid"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
         internal bool GetAttributeFromGuid(string guid, out string name)
         {
             return _domainGuidMap.TryGetValue(guid, out name);
         }
 
+        /// <summary>
+        /// Gets the domain object associated with the specified domain for this DirectorySearcher
+        /// </summary>
+        /// <returns></returns>
         private Domain GetDomain()
         {
             try
@@ -253,12 +314,17 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Gets an LDAPConnection to the Global Catalog
+        /// </summary>
+        /// <returns></returns>
         private LdapConnection GetGlobalCatalogConnection()
         {
+            //Use the domain controller 
             var domainController = _domainController ?? _domainName;
 
             var identifier = new LdapDirectoryIdentifier(domainController, 3268);
-            var connection = new LdapConnection(identifier);
+            var connection = Options.Instance.LdapUsername != null ? new LdapConnection(identifier, new NetworkCredential(Options.Instance.LdapUsername, Options.Instance.LdapPassword)) : new LdapConnection(identifier);
 
             var ldapSessionOptions = connection.SessionOptions;
             if (!Options.Instance.DisableKerberosSigning)
@@ -286,8 +352,9 @@ namespace SharpHound3
                 ? (Options.Instance.SecureLDAP ? 636 : 389)
                 : Options.Instance.LdapPort;
             var identifier = new LdapDirectoryIdentifier(domainController, port, false, false);
-            connection = new LdapConnection(identifier);
 
+            connection = Options.Instance.LdapUsername != null ? new LdapConnection(identifier, new NetworkCredential(Options.Instance.LdapUsername, Options.Instance.LdapPassword)) : new LdapConnection(identifier);
+            
             var ldapSessionOptions = connection.SessionOptions;
             if (!Options.Instance.DisableKerberosSigning)
             {

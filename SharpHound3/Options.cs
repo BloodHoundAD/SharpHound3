@@ -79,6 +79,12 @@ namespace SharpHound3
         [Option(HelpText = "Disables Kerberos Signing/Sealing making LDAP traffic viewable", Default = false)]
         public bool DisableKerberosSigning { get; set; }
 
+        [Option(HelpText = "Username to use for LDAP", Default = null)]
+        public string LdapUsername { get; set; }
+
+        [Option(HelpText = "Password to use for LDAP", Default = null)]
+        public string LdapPassword { get; set; }
+
         //Enumeration Options
         [Option(HelpText = "Skip SMB port checks when connecting to computers", Default = false)]
         public bool SkipPortScan { get; set; }

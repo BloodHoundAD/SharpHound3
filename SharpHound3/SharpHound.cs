@@ -13,9 +13,14 @@ namespace SharpHound3
 {
     internal class SharpHound
     {
+        /// <summary>
+        /// Entry point for SharpHound. 
+        /// </summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
         private static async Task Main(string[] args)
         {
-            //TODO: Trusts
+            // Use the wonderful commandlineparser library to build our options.
             var parser = new Parser(with =>
             {
                 with.CaseInsensitiveEnumValues = true;
@@ -25,6 +30,7 @@ namespace SharpHound3
 
             parser.ParseArguments<Options>(args).WithParsed(o =>
             {
+                //We've successfully parsed arguments, lets do some options post-processing.
                 var currentTime = DateTime.Now;
                 var initString =
                     $"Initializing SharpHound at {currentTime.ToShortTimeString()} on {currentTime.ToShortDateString()}";
@@ -33,6 +39,7 @@ namespace SharpHound3
                 Console.WriteLine(new string('-', initString.Length));
                 Console.WriteLine();
 
+                // Set the current user name for session collection.
                 if (o.OverrideUserName != null)
                 {
                     o.CurrentUserName = o.OverrideUserName;
@@ -42,8 +49,10 @@ namespace SharpHound3
                     o.CurrentUserName = WindowsIdentity.GetCurrent().Name.Split('\\')[1];
                 }
 
+                //Check some loop options
                 if (o.Loop)
                 {
+                    //If loop is set, ensure we actually set options properly
                     if (o.LoopDuration == TimeSpan.Zero)
                     {
                         Console.WriteLine("Loop specified without a duration. Defaulting to 2 hours!");
@@ -67,18 +76,30 @@ namespace SharpHound3
             if (options == null)
                 return;
 
+            // Check to make sure we actually have valid collection methods set
             if (!options.ResolveCollectionMethods())
             {
                 return;
             }
 
+            //If the user didn't specify a domain, pull the domain from DirectoryServices
             if (options.Domain == null)
-                options.Domain = System.DirectoryServices.ActiveDirectory.Domain.GetCurrentDomain().Name;
+                options.Domain = System.DirectoryServices.ActiveDirectory.Domain.GetCurrentDomain().Name.ToUpper();
 
+            //Check to make sure both LDAP options are set if either is set
+            if ((options.LdapPassword != null && options.LdapUsername == null) ||
+                (options.LdapUsername != null && options.LdapPassword == null))
+            {
+                Console.WriteLine("You must specify both LdapUsername and LdapPassword if using these options!");
+                return;
+            }
+
+            //Initial LDAP connection test. Search for the well known administrator SID to make sure we can connect successfully.
             var searcher = Helpers.GetDirectorySearcher(options.Domain);
             var result = await searcher.GetOne($"(objectsid={Helpers.ConvertSidToHexSid("S-1-5-32-544")})", new[] {"objectsid"},
                 SearchScope.Subtree);
 
+            //If we get nothing back from LDAP, something is wrong
             if (result == null)
             {
                 Console.WriteLine("LDAP Connection Test Failed. Check if you're in a domain context!");
@@ -89,6 +110,8 @@ namespace SharpHound3
             var needsCancellation = false;
             Timer timer = null;
             var loopEnd = DateTime.Now;
+
+            //If loop is set, set up our timer for the loop now
             if (options.Loop)
             {
                 loopEnd = loopEnd.AddMilliseconds(options.LoopDuration.TotalMilliseconds);
@@ -105,12 +128,22 @@ namespace SharpHound3
                 timer.Start();
             }
 
+            //Create our Cache
             Cache.CreateInstance();
 
+            //Start the computer error task (if specified)
             OutputTasks.StartComputerStatusTask();
+
+            //Build our pipeline, and get the initial block to wait for completion.
             var pipelineCompletionTask = PipelineBuilder.GetBasePipelineForDomain(options.Domain);
+
+            //Wait for output to complete
             await pipelineCompletionTask;
+
+            //Wait for our output tasks to finish.
             await OutputTasks.CompleteOutput();
+
+            //Mark our initial run as complete, signalling that we're now in the looping phase
             initialCompleted = true;
 
             if (needsCancellation)
@@ -118,6 +151,7 @@ namespace SharpHound3
                 Helpers.InvokeCancellation();
             }
 
+            //Start looping if specified
             if (Options.Instance.Loop)
             {
                 if (Helpers.GetCancellationToken().IsCancellationRequested)
@@ -174,13 +208,16 @@ namespace SharpHound3
                     if (count > 0)
                         Console.WriteLine($"Looping finished! Looped a total of {count} times");
 
+                    //Special function to grab all the zip files created by looping and collapse them into a single file
                     await OutputTasks.CollapseLoopZipFiles();
                 }
             }
             timer?.Dispose();
 
+            //Program exit started. Save the cache file
             Cache.Instance.SaveCache();
 
+            //And we're done!
             Console.WriteLine();
             Console.WriteLine("SharpHound Enumeration Completed! Happy Graphing!");
             Console.WriteLine();
