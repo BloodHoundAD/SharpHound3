@@ -172,6 +172,11 @@ namespace SharpHound3
                     objectType = LdapTypeEnum.Domain;
                 }
             }
+
+            //Override GMSA object type
+            if (searchResultEntry.GetPropertyAsBytes("msds-groupmsamembership") != null)
+                objectType = LdapTypeEnum.User;
+
             return objectType;
         }
 

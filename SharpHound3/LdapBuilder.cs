@@ -14,6 +14,8 @@ namespace SharpHound3
             //We always want these properties to ensure we can at least pass type finding: "samaccounttype", "objectsid", "objectguid", "objectclass"
             ldapProperties.AddRange(Helpers.ResolutionProps);
             ldapProperties.Add("samaccountname");
+            //Add this property to check for GMSAs
+            ldapProperties.Add("msds-groupmsamembership");
             //LAPS is weird and several collection methods depend on it, but its easier to just have the property in all our collections
             ldapProperties.Add("ms-mcs-admpwdexpirationtime");
             

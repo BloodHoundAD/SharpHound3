@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.DirectoryServices;
 using System.Linq;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using SharpHound3.Enums;
@@ -29,14 +30,62 @@ namespace SharpHound3.Tasks
             };
         }
 
-        internal static async Task<LdapWrapper> ProcessDACL(LdapWrapper wrapper)
+        internal static async Task<LdapWrapper> ProcessAces(LdapWrapper wrapper)
+        {
+            var aclAces = await ProcessDACL(wrapper);
+            var gmsaAces = await ProcessGMSA(wrapper);
+
+            wrapper.Aces = aclAces.Concat(gmsaAces).ToArray();
+            return wrapper;
+        }
+
+        private static async Task<List<ACL>> ProcessGMSA(LdapWrapper wrapper)
+        {
+            var aces = new List<ACL>();
+            var securityDescriptor = wrapper.SearchResult.GetPropertyAsBytes("msds-groupmsamembership");
+
+            if (securityDescriptor == null)
+                return aces;
+
+            var descriptor = new ActiveDirectorySecurity();
+            descriptor.SetSecurityDescriptorBinaryForm(securityDescriptor);
+
+            foreach (ActiveDirectoryAccessRule ace in descriptor.GetAccessRules(true,true, typeof(SecurityIdentifier)))
+            {
+                if (ace == null)
+                    continue;
+                
+                if (ace.AccessControlType == AccessControlType.Deny)
+                    continue;
+
+                var principalSid = FilterAceSids(ace.IdentityReference.Value);
+
+                if (principalSid == null)
+                    continue;
+
+                var (finalSid, type) = await ResolutionHelpers.ResolveSidAndGetType(principalSid, wrapper.Domain);
+
+                aces.Add(new ACL
+                {
+                    RightName = "ReadGMSAPassword",
+                    AceType = "",
+                    PrincipalSID = finalSid,
+                    PrincipalType = type,
+                    IsInherited = false
+                });
+            }
+
+            return aces;
+        }
+
+        private static async Task<List<ACL>> ProcessDACL(LdapWrapper wrapper)
         {
             var aces = new List<ACL>();
             var ntSecurityDescriptor = wrapper.SearchResult.GetPropertyAsBytes("ntsecuritydescriptor");
 
             //If the NTSecurityDescriptor is null, something screwy is happening. Nothing to process here, so continue in the pipeline
             if (ntSecurityDescriptor == null)
-                return wrapper;
+                return aces;
 
             var descriptor = new ActiveDirectorySecurity();
             descriptor.SetSecurityDescriptorBinaryForm(ntSecurityDescriptor);
@@ -285,9 +334,9 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            wrapper.Aces = aces.Distinct().ToArray();
-            return wrapper;
+            return aces;
         }
+
 
         /// <summary>
         /// Helper function to determine if an ACE actually applies to the object through inheritance

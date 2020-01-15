@@ -71,6 +71,10 @@ namespace SharpHound3.Tasks
                 objectIdentifier = objectId;
             }
 
+            //Override GMSA object type
+            if (searchResultEntry.GetPropertyAsBytes("msds-groupmsamembership") != null) 
+                objectType = LdapTypeEnum.User;
+
             //Depending on the object type, create the appropriate wrapper object
             switch (objectType)
             {

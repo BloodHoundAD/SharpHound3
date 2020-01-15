@@ -64,7 +64,7 @@ namespace SharpHound3.Tasks
             //Start with pure LDAP collection methods
             if ((resolvedMethods & CollectionMethodResolved.ACL) != 0)
             {
-                block = new TransformBlock<LdapWrapper, LdapWrapper>(ACLTasks.ProcessDACL, executionOptions);
+                block = new TransformBlock<LdapWrapper, LdapWrapper>(ACLTasks.ProcessAces, executionOptions);
                 blocks.Add(block);
             }
 
