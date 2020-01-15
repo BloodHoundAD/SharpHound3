@@ -3,12 +3,18 @@ using static SharpHound3.Enums.LdapTypeEnum;
 
 namespace SharpHound3
 {
+    /// <summary>
+    /// Helper class to deal with Well Known SIDs
+    /// </summary>
     internal class CommonPrincipal
     {
         private string _principalName;
 
         internal LdapTypeEnum Type { get; set; }
 
+        /// <summary>
+        /// Setter to ensure that the principal name is always upper case
+        /// </summary>
         internal string Name
         {
             get => _principalName;
@@ -21,6 +27,12 @@ namespace SharpHound3
             Type = type;
         }
 
+        /// <summary>
+        /// Gets the principal associate with a well known SID
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <param name="commonPrincipal"></param>
+        /// <returns>True if SID matches a well known principal, false otherwise</returns>
         public static bool GetCommonSid(string sid, out CommonPrincipal commonPrincipal)
         {
             switch (sid)
