@@ -343,6 +343,9 @@ namespace SharpHound3
             var result = await searcher.GetOne("(objectclass=*)", GroupMembershipLookupProps, SearchScope.Base,
                 distinguishedName);
 
+            if (result == null)
+                return (null, LdapTypeEnum.Unknown);
+
             var sid = result.GetSid();
             var type = result.GetLdapType();
 
