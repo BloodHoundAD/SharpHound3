@@ -30,6 +30,7 @@ namespace SharpHound3
             _domain = GetDomain();
             _domainName = Helpers.NormalizeDomainName(domainName);
             _domainController = Options.Instance.DomainController ?? domainController;
+            _domainGuidMap = new Dictionary<string, string>();
             CreateSchemaMap();
         }
 
@@ -104,22 +105,20 @@ namespace SharpHound3
                 var task = Task<SearchResponse>.Factory.FromAsync(iAsyncResult,
                     x => (SearchResponse) connection.EndSendRequest(x));
 
-                try
-                {
-                    //Wait for the search request to finish
-                    var response = await task;
+                
+                //Wait for the search request to finish
+                var response = await task;
 
-                    //Check if theres entries
-                    if (response.Entries.Count == 0)
-                        return null;
-
-                    //Return the first search result entry
-                    return response.Entries[0];
-                }
-                catch
-                {
+                //Check if theres entries
+                if (response.Entries.Count == 0)
                     return null;
-                }
+
+                //Return the first search result entry
+                return response.Entries[0];
+            }
+            catch
+            {
+                return null;
             }
             finally
             {
