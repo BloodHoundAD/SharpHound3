@@ -159,8 +159,8 @@ namespace SharpHound3
             }
 
             //If we get here, everything has failed, and life is very sad.
-            tempName = tempName ?? normalizedHostname;
-            tempDomain = tempDomain ?? normalizedDomain;
+            tempName = normalizedHostname;
+            tempDomain = normalizedDomain;
 
             if (tempName.Contains("."))
             {
