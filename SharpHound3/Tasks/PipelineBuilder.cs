@@ -110,8 +110,8 @@ namespace SharpHound3.Tasks
 
             //Start computer block
 
-            //Only add this block if there's actually computer collection happening AND we're not skipping ping
-            if (!options.SkipPortScan && options.IsComputerCollectionSet())
+            //Only add this block if there's actually computer collection happening 
+            if (options.IsComputerCollectionSet())
             {
                 block = new TransformBlock<LdapWrapper, LdapWrapper>(ComputerAvailableTasks.CheckSMBOpen,
                     executionOptions);

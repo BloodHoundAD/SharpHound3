@@ -17,14 +17,17 @@ namespace SharpHound3.Tasks
 
         internal static async Task<LdapWrapper> ProcessLoggedOn(LdapWrapper wrapper)
         {
-            if (wrapper is Computer computer && !computer.PingFailed)
+            if (wrapper is Computer computer)
             {
-                var sessions = new List<Session>();
-                sessions.AddRange(await GetLoggedOnUsersAPI(computer));
-                sessions.AddRange(GetLoggedOnUsersRegistry(computer));
-                var temp = computer.Sessions.ToList();
-                temp.AddRange(sessions);
-                computer.Sessions = temp.Distinct().ToArray();
+                if (computer.IsWindows && !computer.PingFailed)
+                {
+                    var sessions = new List<Session>();
+                    sessions.AddRange(await GetLoggedOnUsersAPI(computer));
+                    sessions.AddRange(GetLoggedOnUsersRegistry(computer));
+                    var temp = computer.Sessions.ToList();
+                    temp.AddRange(sessions);
+                    computer.Sessions = temp.Distinct().ToArray();
+                }
             }
 
             await Helpers.DoDelay();

@@ -14,7 +14,7 @@ namespace SharpHound3.Tasks
     {
         internal static async Task<LdapWrapper> GetLocalGroupMembers(LdapWrapper wrapper)
         {
-            if (wrapper is Computer computer && !computer.PingFailed)
+            if (wrapper is Computer computer && computer.IsWindows && !computer.PingFailed)
             {
                 var opts = Options.Instance.ResolvedCollectionMethods;
                 if ((opts & CollectionMethodResolved.DCOM) != 0)

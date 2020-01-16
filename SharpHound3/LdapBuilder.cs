@@ -18,7 +18,11 @@ namespace SharpHound3
             ldapProperties.Add("msds-groupmsamembership");
             //LAPS is weird and several collection methods depend on it, but its easier to just have the property in all our collections
             ldapProperties.Add("ms-mcs-admpwdexpirationtime");
-            
+
+            //Add the operatingsystem property for WindowsOnly so we can pre-filter hosts
+            if (Options.Instance.WindowsOnly) 
+                ldapProperties.Add("operatingsystem");
+
             //Group membership collection
             if (methods.HasFlag(CollectionMethodResolved.Group))
             {
@@ -92,11 +96,6 @@ namespace SharpHound3
             if (userFilter != null)
             {
                 finalFilter = $"(&({finalFilter})({userFilter}))";
-            }
-
-            if (Options.Instance.WindowsOnly)
-            {
-                finalFilter = $"(&({finalFilter})(operatingsystem=*windows*))";
             }
 
             return new LdapQueryData

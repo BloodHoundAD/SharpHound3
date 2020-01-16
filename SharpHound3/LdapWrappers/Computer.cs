@@ -18,6 +18,7 @@ namespace SharpHound3.LdapWrappers
             PSRemoteUsers= new GenericMember[0];
             IsStealthTarget = false;
             IsDomainController = false;
+            IsWindows = true;
         }
 
         [JsonIgnore]
@@ -47,6 +48,9 @@ namespace SharpHound3.LdapWrappers
 
         [JsonIgnore]
         internal bool IsDomainController { get; set; }
+
+        [JsonIgnore]
+        internal bool IsWindows { get; set; }
 
         /// <summary>
         /// Returns the name used for network calls, based on options set

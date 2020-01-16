@@ -14,7 +14,7 @@ namespace SharpHound3.Tasks
     {
         internal static async Task<LdapWrapper> ProcessNetSessions(LdapWrapper wrapper)
         {
-            if (wrapper is Computer computer && !computer.PingFailed)
+            if (wrapper is Computer computer && computer.IsWindows && !computer.PingFailed)
             {
                 //If ExcludeDC is set remove DCs from collection
                 if (Options.Instance.ExcludeDomainControllers && computer.IsDomainController)
