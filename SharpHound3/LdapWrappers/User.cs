@@ -16,5 +16,7 @@ namespace SharpHound3.LdapWrappers
         public SPNTarget[] SPNTargets { get; set; }
 
         public string PrimaryGroupSid { get; set; }
+
+        public ResolvedPrincipal[] HasSIDHistory { get; set; }
     }
 }

@@ -259,9 +259,29 @@ namespace SharpHound3.Tasks
                 wrapper.Properties.Add("admincount", a != 0);
             }
             else
-            {
                 wrapper.Properties.Add("admincount", false);
+
+            var sidHistory = result.GetPropertyAsArrayOfBytes("sidhistory");
+            var sidHistoryList = new List<string>();
+            var sidHistoryPrincipals = new List<ResolvedPrincipal>();
+            foreach (var sid in sidHistory)
+            {
+                var s = Helpers.CreateSecurityIdentifier(sid)?.Value;
+                if (s != null)
+                {
+                    sidHistoryList.Add(s);
+                    var sidType = await ResolutionHelpers.LookupSidType(s, wrapper.Domain);
+                    if (sidType != LdapTypeEnum.Unknown)
+                        sidHistoryPrincipals.Add(new ResolvedPrincipal
+                        {
+                            ObjectIdentifier = s,
+                            ObjectType = sidType
+                        });
+                }
             }
+
+            wrapper.HasSIDHistory = sidHistoryPrincipals.ToArray();
+            wrapper.Properties.Add("sidhistory", sidHistoryList.ToArray());
         }
 
         private static long ConvertToUnixEpoch(string ldapTime)

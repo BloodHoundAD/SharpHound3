@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.DirectoryServices;
 using System.DirectoryServices.Protocols;
 using System.Linq;
@@ -85,6 +86,21 @@ namespace SharpHound3
             var strings = values.GetValues(typeof(string));
 
             if (!(strings is string[] result))
+                return null;
+
+            return result;
+        }
+
+        public static byte[][] GetPropertyAsArrayOfBytes(this SearchResultEntry searchResultEntry, string property)
+        {
+            var list = new List<byte[]>();
+            if (!searchResultEntry.Attributes.Contains(property))
+                return list.ToArray();
+
+            var values = searchResultEntry.Attributes[property];
+            var bytes = values.GetValues(typeof(byte[]));
+
+            if (!(bytes is byte[][] result))
                 return null;
 
             return result;

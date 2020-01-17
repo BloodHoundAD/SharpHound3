@@ -20,14 +20,14 @@ namespace SharpHound3
             ldapProperties.Add("ms-mcs-admpwdexpirationtime");
 
             //Add the operatingsystem property for WindowsOnly so we can pre-filter hosts
-            if (Options.Instance.WindowsOnly) 
+            if (Options.Instance.WindowsOnly)
                 ldapProperties.Add("operatingsystem");
 
             //Group membership collection
             if (methods.HasFlag(CollectionMethodResolved.Group))
             {
                 ldapFilterParts.Add("(|(samaccounttype=268435456)(samaccounttype=268435457)(samaccounttype=536870912)(samaccounttype=536870913)(primarygroupid=*))");
-                ldapProperties.AddRange(new [] {"member", "primarygroupid"});
+                ldapProperties.AddRange(new[] { "member", "primarygroupid" });
             }
 
             //Computer collection methods: ask for non-disabled computer objects
@@ -42,7 +42,7 @@ namespace SharpHound3
             if (methods.HasFlag(CollectionMethodResolved.ACL))
             {
                 ldapFilterParts.Add("(|(samAccountType=805306368)(samAccountType=805306369)(samAccountType=268435456)(samAccountType=268435457)(samAccountType=536870912)(samAccountType=536870913)(objectClass=domain)(&(objectcategory=groupPolicyContainer)(flags=*))(objectcategory=organizationalUnit))");
-                ldapProperties.AddRange(new []
+                ldapProperties.AddRange(new[]
                 {
                     "ntsecuritydescriptor", "displayname", "name"
                 });
@@ -62,14 +62,15 @@ namespace SharpHound3
                     "sidhistory", "useraccountcontrol", "operatingsystem",
                     "operatingsystemservicepack", "serviceprincipalname", "displayname", "mail", "title",
                     "homedirectory","description","admincount","userpassword","gpcfilesyspath","objectclass",
-                    "msds-behavior-version","objectguid", "name", "gpoptions", "msds-allowedToDelegateTo", "msDS-AllowedToActOnBehalfOfOtherIdentity", "displayname"
+                    "msds-behavior-version","objectguid", "name", "gpoptions", "msds-allowedToDelegateTo", "msDS-AllowedToActOnBehalfOfOtherIdentity", "displayname",
+                    "sidhistory"
                 });
             }
 
             if (methods.HasFlag(CollectionMethodResolved.Container))
             {
                 ldapFilterParts.Add("(|(&(&(objectcategory=groupPolicyContainer)(flags=*))(name=*)(gpcfilesyspath=*))(objectcategory=organizationalUnit)(objectClass=domain))");
-                ldapProperties.AddRange(new[] {"gplink", "gpoptions", "name", "displayname"});
+                ldapProperties.AddRange(new[] { "gplink", "gpoptions", "name", "displayname" });
             }
 
             if (methods.HasFlag(CollectionMethodResolved.GPOLocalGroup))
@@ -77,7 +78,7 @@ namespace SharpHound3
                 //ldapFilterParts.Add("(&(&(objectcategory=groupPolicyContainer)(flags=*))(name=*)(gpcfilesyspath=*))");
                 //ldapProperties.AddRange(new[] {"gpcfilesyspath", "displayname"});
                 ldapFilterParts.Add("(&(|(objectcategory=organizationalUnit)(objectclass=domain))(gplink=*))");
-                ldapProperties.AddRange(new []{"gplink", "name" });
+                ldapProperties.AddRange(new[] { "gplink", "name" });
             }
 
             if (methods.HasFlag(CollectionMethodResolved.SPNTargets))
