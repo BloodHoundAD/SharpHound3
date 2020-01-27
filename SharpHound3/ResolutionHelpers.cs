@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.ComponentModel.Design;
 using System.DirectoryServices.Protocols;
 using System.Linq;
 using System.Net;
@@ -12,7 +10,6 @@ using System.Text;
 using System.Threading.Tasks;
 using DnsClient;
 using SharpHound3.Enums;
-using SharpHound3.JSON;
 
 namespace SharpHound3
 {

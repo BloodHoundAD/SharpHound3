@@ -1,16 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.DirectoryServices.Protocols;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Security.Principal;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
-using SharpHound3.Producers;
 
 namespace SharpHound3.Tasks
 {

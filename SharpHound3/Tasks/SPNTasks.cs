@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.DirectoryServices.Protocols;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;

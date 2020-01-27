@@ -1,14 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.DirectoryServices.Protocols;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
-using SharpHound3.Tasks;
 
 namespace SharpHound3.Producers
 {
+    /// <summary>
+    /// Base class for producing LDAP data to feed to other parts of the program
+    /// </summary>
     internal abstract class BaseProducer
     {
         protected static Dictionary<string, SearchResultEntry> DomainControllerSids;
@@ -19,6 +19,7 @@ namespace SharpHound3.Producers
 
         protected BaseProducer(string domainName, string query, string[] props)
         {
+            //Create a Directory Searcher using the domain specified
             Searcher = Helpers.GetDirectorySearcher(domainName);
             Query = query;
             Props = props;
@@ -26,6 +27,10 @@ namespace SharpHound3.Producers
             SetDomainControllerSids(GetDomainControllerSids());
         }
 
+        /// <summary>
+        /// Sets the dictionary of Domain Controller sids, and merges in new ones
+        /// </summary>
+        /// <param name="dcs"></param>
         private static void SetDomainControllerSids(Dictionary<string, SearchResultEntry> dcs)
         {
             if (DomainControllerSids == null)
@@ -41,21 +46,39 @@ namespace SharpHound3.Producers
             }
         }
 
+        /// <summary>
+        /// Checks if a SID is in the domain controllers list
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <returns></returns>
         internal static bool IsSidDomainController(string sid)
         {
             return DomainControllerSids.ContainsKey(sid);
         }
 
+        /// <summary>
+        /// Gets the dictionary of Domain Controller sids
+        /// </summary>
+        /// <returns></returns>
         internal static Dictionary<string, SearchResultEntry> GetDomainControllers()
         {
             return DomainControllerSids;
         }
 
+        /// <summary>
+        /// Starts the producer. 
+        /// </summary>
+        /// <param name="queue"></param>
+        /// <returns></returns>
         internal Task StartProducer(ITargetBlock<SearchResultEntry> queue)
         {
             return Task.Run(async () => { await ProduceLdap(queue); });
         }
 
+        /// <summary>
+        /// Populates the list of domain controller SIDs using LDAP
+        /// </summary>
+        /// <returns></returns>
         protected Dictionary<string, SearchResultEntry> GetDomainControllerSids()
         {
             Console.WriteLine("[+] Pre-populating Domain Controller SIDS");
@@ -72,6 +95,11 @@ namespace SharpHound3.Producers
             return temp;
         }
 
+        /// <summary>
+        /// Produces SearchResultEntry items from LDAP and pushes them to a queue.
+        /// </summary>
+        /// <param name="queue"></param>
+        /// <returns></returns>
         protected abstract Task ProduceLdap(ITargetBlock<SearchResultEntry> queue);
     }
 }

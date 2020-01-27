@@ -2,6 +2,9 @@
 
 namespace SharpHound3.Enums
 {
+    /// <summary>
+    /// Flags for the UserAccountControl attribute
+    /// </summary>
     [Flags]
     public enum UacFlags
     {

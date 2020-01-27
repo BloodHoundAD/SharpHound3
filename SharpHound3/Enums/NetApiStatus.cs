@@ -1,5 +1,8 @@
 ﻿namespace SharpHound3.Enums
 {
+    /// <summary>
+    /// Enum representing return codes from NETAPI calls
+    /// </summary>
     internal enum NetApiStatus
     {
         NERR_Success = 0,

@@ -4,6 +4,9 @@ using SharpHound3.JSON;
 
 namespace SharpHound3.LdapWrappers
 {
+    /// <summary>
+    /// Encapsulates all the information for a Computer object
+    /// </summary>
     internal class Computer : LdapWrapper
     {
         internal Computer(SearchResultEntry entry) : base(entry)

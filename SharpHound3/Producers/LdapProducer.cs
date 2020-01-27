@@ -12,12 +12,19 @@ namespace SharpHound3.Producers
         {
         }
 
+        /// <summary>
+        /// Uses the LDAP filter and properties specified to grab data from LDAP, and push it to the queue.
+        /// </summary>
+        /// <param name="queue"></param>
+        /// <returns></returns>
         protected override async Task ProduceLdap(ITargetBlock<SearchResultEntry> queue)
         {
             var token = Helpers.GetCancellationToken();
             OutputTasks.StartOutputTimer();
+            //Do a basic  LDAP search and grab results
             foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree))
             {
+                //If our cancellation token is set, cancel out of our loop
                 if (token.IsCancellationRequested)
                 {
                     Console.WriteLine("[-] Terminating Producer as cancellation was requested. Waiting for pipeline to finish");

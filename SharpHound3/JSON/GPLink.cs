@@ -1,5 +1,8 @@
 ﻿namespace SharpHound3.JSON
 {
+    /// <summary>
+    /// Represents a link from an OU to a GPO
+    /// </summary>
     internal class GPLink
     {
         private string _guid;

@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.DirectoryServices.Protocols;
 using System.Linq;
-using System.Security.Policy;
 using SharpHound3.Enums;
 using SharpHound3.LdapWrappers;
 using SharpHound3.Producers;
@@ -11,6 +9,11 @@ namespace SharpHound3.Tasks
 {
     internal static class ConvertToWrapperTasks
     {
+        /// <summary>
+        /// Converts a SaerchResultEntry into an LdapWrapper
+        /// </summary>
+        /// <param name="searchResultEntry"></param>
+        /// <returns></returns>
         internal static LdapWrapper CreateLdapWrapper(SearchResultEntry searchResultEntry)
         {
             //Look for a null DN first. Not sure why this would happen.
@@ -23,6 +26,8 @@ namespace SharpHound3.Tasks
             var accountDomain = Helpers.DistinguishedNameToDomain(distinguishedName);
             var objectSid = searchResultEntry.GetSid();
             var objectId = searchResultEntry.GetObjectIdentifier();
+
+            //If objectsid/id is null, return
             if (objectSid == null && objectId == null)
                 return null;
 
@@ -77,8 +82,7 @@ namespace SharpHound3.Tasks
                 objectType = LdapTypeEnum.User;
                 accountName = accountName?.TrimEnd('$');
             }
-                
-
+            
             //Depending on the object type, create the appropriate wrapper object
             switch (objectType)
             {
@@ -148,26 +152,32 @@ namespace SharpHound3.Tasks
                     throw new ArgumentOutOfRangeException();
             }
 
+            //Null wrappers happen when we cant resolve the object type. Shouldn't ever happen, but just in case, return null here
             if (wrapper == null)
             {
                 Console.WriteLine($"Null Wrapper: {distinguishedName}");
                 return null;
             }
 
-            //Set the DN/SID for the wrapper going forward
+            //Set the DN/SID for the wrapper going forward and a couple other properties
             wrapper.DistinguishedName = distinguishedName;
             wrapper.Properties.Add("name", wrapper.DisplayName);
             wrapper.Properties.Add("domain", wrapper.Domain);
             wrapper.Properties.Add("objectid", objectIdentifier.ToUpper());
             wrapper.Properties.Add("distinguishedname", distinguishedName);
             wrapper.ObjectIdentifier = objectIdentifier;
+
+            //Some post processing
             PostProcessWrapper(wrapper);
+
+            //Cache the distinguished name from this object
             Cache.Instance.Add(wrapper.DistinguishedName, new ResolvedPrincipal
             {
                 ObjectIdentifier = wrapper.ObjectIdentifier,
                 ObjectType = objectType
             });
 
+            //If the objectidentifier is a SID, cache this mapping too
             if (objectIdentifier.StartsWith("S-1-5"))
             {
                 Cache.Instance.Add(wrapper.ObjectIdentifier, objectType);
@@ -177,6 +187,10 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Post-processing on wrapper objects to set stealth/domain controller targets
+        /// </summary>
+        /// <param name="wrapper"></param>
         private static void PostProcessWrapper(LdapWrapper wrapper)
         {
             var opts = Options.Instance;

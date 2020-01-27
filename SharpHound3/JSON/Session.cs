@@ -2,6 +2,9 @@
 
 namespace SharpHound3.JSON
 {
+    /// <summary>
+    /// Represents a session on a computer
+    /// </summary>
     internal class Session : IEquatable<Session>
     {
         private string _computerId;

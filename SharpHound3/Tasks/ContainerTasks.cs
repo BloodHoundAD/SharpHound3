@@ -9,10 +9,14 @@ using SharpHound3.LdapWrappers;
 
 namespace SharpHound3.Tasks
 {
+    /// <summary>
+    /// Tasks for enumerating container objects
+    /// </summary>
     internal class ContainerTasks
     {
         internal static async Task<LdapWrapper> EnumerateContainer(LdapWrapper wrapper)
         {
+            //We only need to process OU and Domain Objects
             if (wrapper is OU ou)
             {
                 await ProcessOUObject(ou);
@@ -24,17 +28,26 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Processes domain objects
+        /// </summary>
+        /// <param name="domain"></param>
+        /// <returns></returns>
         private static async Task ProcessDomainObject(Domain domain)
         {
             var searchResult = domain.SearchResult;
             var resolvedLinks = new List<GPLink>();
 
+            //Grab the gplink property
             var gpLinks = searchResult.GetProperty("gplink");
 
+            //If gplink is null, return
             if (gpLinks != null)
             {
+                //Loop over each link in the property, which will be encapsulated by [] and start with LDAP://
                 foreach (var link in gpLinks.Split(']', '[').Where(l => l.StartsWith("LDAP")))
                 {
+                    //Split the GPLink value. The distinguishedname will be in the first part, and the status of the gplink in the second
                     var splitLink = link.Split(';');
                     var distinguishedName = splitLink[0];
                     distinguishedName =
@@ -49,6 +62,7 @@ namespace SharpHound3.Tasks
                     //If the status is 0, its unenforced, 2 is enforced
                     var enforced = status == "2";
 
+                    //Try to get the GUID of the OU from its distinguishedname
                     var (success, guid) = await ResolutionHelpers.OUDistinguishedNameToGuid(distinguishedName);
                     if (success)
                     {
@@ -61,18 +75,25 @@ namespace SharpHound3.Tasks
                 }
             }
 
+            // Find the descendant users, computers, and OUs directly under this domain object
             var users = new List<string>();
             var computers = new List<string>();
             var ous = new List<string>();
 
+            //Create a directory searcher object for the domain
             var searcher = Helpers.GetDirectorySearcher(domain.Domain);
+
+            //Search for descendant objects with the OneLevel specification
             foreach (var containedObject in searcher.QueryLdap(
                 "(|(samAccountType=805306368)(samAccountType=805306369)(objectclass=organizationalUnit))", Helpers.ResolutionProps, SearchScope.OneLevel, domain.DistinguishedName))
             { 
+                //Grab the type of the object found
                 var type = containedObject.GetLdapType();
 
+                // Get the identifier of the object
                 var id = containedObject.GetObjectIdentifier();
 
+                //If we dont have an identifier for this object, something is wrong, so just continue
                 if (id == null)
                     continue;
 
@@ -92,9 +113,11 @@ namespace SharpHound3.Tasks
                 }
             }
 
+            //Search for descendant container objects
             foreach (var containerObject in searcher.QueryLdap("(objectclass=container)", Helpers.ResolutionProps,
                 SearchScope.OneLevel, domain.DistinguishedName))
             {
+                // Search for all the user/computer objects inside the container
                 foreach (var subObject in searcher.QueryLdap("(|(samAccountType=805306368)(samAccountType=805306369))",
                     Helpers.ResolutionProps, SearchScope.Subtree, containerObject.DistinguishedName))
                 {
@@ -126,18 +149,29 @@ namespace SharpHound3.Tasks
             domain.Links = resolvedLinks.ToArray();
         }
 
+        /// <summary>
+        /// Processes OU objects
+        /// </summary>
+        /// <param name="ou"></param>
+        /// <returns></returns>
         private static async Task ProcessOUObject(OU ou)
         {
             var searchResult = ou.SearchResult;
+
+            //Grab the gpoptions attribute
             var gpOptions = searchResult.GetProperty("gpoptions");
 
+            //Add a property for blocking inheritance
             ou.Properties.Add("blocksinheritance", gpOptions != null && gpOptions == "1");
 
             var resolvedLinks = new List<GPLink>();
 
+            //Grab the gplink property
             var gpLinks = searchResult.GetProperty("gplink");
+
             if (gpLinks != null)
             {
+                //Loop over the links in the gplink property
                 foreach (var link in gpLinks.Split(']', '[').Where(l => l.StartsWith("LDAP")))
                 {
                     var splitLink = link.Split(';');
@@ -170,6 +204,8 @@ namespace SharpHound3.Tasks
             var ous = new List<string>();
 
             var searcher = Helpers.GetDirectorySearcher(ou.Domain);
+
+            // Find descendant User, Computer, OU objects
             foreach (var containedObject in searcher.QueryLdap(
                 "(|(samAccountType=805306368)(samAccountType=805306369)(objectclass=organizationalUnit))",
                 Helpers.ResolutionProps, SearchScope.OneLevel, ou.DistinguishedName))

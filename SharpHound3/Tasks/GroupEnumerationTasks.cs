@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.DirectoryServices.Protocols;
 using System.Linq;
 using System.Timers;
 using System.Threading.Tasks;
 using SharpHound3.Enums;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
-using SearchScope = System.DirectoryServices.Protocols.SearchScope;
 
 namespace SharpHound3.Tasks
 {

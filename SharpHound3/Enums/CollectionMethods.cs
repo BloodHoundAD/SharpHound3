@@ -2,6 +2,9 @@
 
 namespace SharpHound3.Enums
 {
+    /// <summary>
+    /// Enums representing the possible collection methods specified in options
+    /// </summary>
     public enum CollectionMethodOptions
     {
         None,
@@ -25,6 +28,9 @@ namespace SharpHound3.Enums
         All
     }
 
+    /// <summary>
+    /// Enum representing collection methods after being resolved from option sets
+    /// </summary>
     [Flags]
     public enum CollectionMethodResolved
     {

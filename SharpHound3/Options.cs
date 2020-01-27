@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using CommandLine;
 using SharpHound3.Enums;
-using SharpHound3.LdapWrappers;
 
 namespace SharpHound3
 {

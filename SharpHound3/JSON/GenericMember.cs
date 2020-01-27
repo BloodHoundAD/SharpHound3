@@ -3,6 +3,9 @@ using SharpHound3.Enums;
 
 namespace SharpHound3.JSON
 {
+    /// <summary>
+    /// Represents a member of a group or a local group
+    /// </summary>
     internal class GenericMember : IEquatable<GenericMember>
     {
         public string MemberId { get; set; }

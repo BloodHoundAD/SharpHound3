@@ -15,7 +15,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using DnsClient;
 using SharpHound3.Enums;
-using SharpHound3.Producers;
 using SharpHound3.Tasks;
 using Domain = System.DirectoryServices.ActiveDirectory.Domain;
 

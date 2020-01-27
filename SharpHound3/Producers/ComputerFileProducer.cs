@@ -1,15 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.DirectoryServices.Protocols;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using SharpHound3.Tasks;
 
 namespace SharpHound3.Producers
 {
+    /// <summary>
+    /// Substitute producer for the ComputerFile option
+    /// </summary>
     internal class ComputerFileProducer : BaseProducer
     {
 
@@ -17,20 +17,30 @@ namespace SharpHound3.Producers
         {
         }
 
+        /// <summary>
+        /// Grabs computers names from the text file specified in the options, and attempts to resolve them to LDAP objects.
+        /// Pushes the corresponding LDAP objects to the queue.
+        /// </summary>
+        /// <param name="queue"></param>
+        /// <returns></returns>
         protected override async Task ProduceLdap(ITargetBlock<SearchResultEntry> queue)
         {
             var computerFile = Options.Instance.ComputerFile;
             var token = Helpers.GetCancellationToken();
             OutputTasks.StartOutputTimer();
+            //Open the file for reading
             using (var fileStream = new StreamReader(new FileStream(computerFile, FileMode.Open, FileAccess.Read)))
             {
                 string computer;
+                // Loop over each line in the file
                 while ((computer = fileStream.ReadLine()) != null)
                 {
+                    //If the cancellation token is set, cancel enumeration
                     if (token.IsCancellationRequested)
                     {
                         break;
                     }
+
                     string sid;
                     if (!computer.StartsWith("S-1-5-21"))
                     { 

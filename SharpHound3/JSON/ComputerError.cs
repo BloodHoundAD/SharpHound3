@@ -18,6 +18,11 @@ namespace SharpHound3.JSON
             return $"{StringToCsvCell(ComputerName)}, {StringToCsvCell(Task)}, {StringToCsvCell(Status)}";
         }
 
+        /// <summary>
+        /// Helper function to escape text before encoding to CSV
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
         private static string StringToCsvCell(string str)
         {
             if (str == null)

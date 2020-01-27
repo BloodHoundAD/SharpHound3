@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.DirectoryServices;
 using System.Linq;
 using System.Security.AccessControl;
-using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Threading.Tasks;
-using SharpHound3.Enums;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
 
@@ -19,6 +17,7 @@ namespace SharpHound3.Tasks
 
         static ACLTasks()
         {
+            //Create a dictionary with the base GUIDs of each object type
             BaseGuids = new Dictionary<Type, string>
             {
                 {typeof(User), "bf967aba-0de6-11d0-a285-00aa003049e2"},
@@ -30,6 +29,11 @@ namespace SharpHound3.Tasks
             };
         }
 
+        /// <summary>
+        /// Base function for processing ACES
+        /// </summary>
+        /// <param name="wrapper"></param>
+        /// <returns></returns>
         internal static async Task<LdapWrapper> ProcessAces(LdapWrapper wrapper)
         {
             var aclAces = await ProcessDACL(wrapper);
@@ -39,30 +43,44 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Processes the msds-groupmsamembership property, and determines who can read the password
+        /// </summary>
+        /// <param name="wrapper"></param>
+        /// <returns></returns>
         private static async Task<List<ACL>> ProcessGMSA(LdapWrapper wrapper)
         {
             var aces = new List<ACL>();
+            //Grab the property as a byte array
             var securityDescriptor = wrapper.SearchResult.GetPropertyAsBytes("msds-groupmsamembership");
 
+            //If the property is null, its either not a GMSA or something went wrong, so just exit out
             if (securityDescriptor == null)
                 return aces;
 
+            //Create a new ActiveDirectorySecurity object and set the bytes to the descriptor
             var descriptor = new ActiveDirectorySecurity();
             descriptor.SetSecurityDescriptorBinaryForm(securityDescriptor);
 
+            // Loop over the entries in the security descriptor
             foreach (ActiveDirectoryAccessRule ace in descriptor.GetAccessRules(true,true, typeof(SecurityIdentifier)))
             {
+                //Ignore null aces
                 if (ace == null)
                     continue;
                 
+                //Ignore deny aces (although this should never show up in GMSAs
                 if (ace.AccessControlType == AccessControlType.Deny)
                     continue;
 
+                //Pre-process the principal for the SID
                 var principalSid = FilterAceSids(ace.IdentityReference.Value);
 
+                //Ignore null SIDs
                 if (principalSid == null)
                     continue;
 
+                //Resolve the principal SID and grab its type
                 var (finalSid, type) = await ResolutionHelpers.ResolveSidAndGetType(principalSid, wrapper.Domain);
 
                 aces.Add(new ACL
@@ -78,22 +96,32 @@ namespace SharpHound3.Tasks
             return aces;
         }
 
+        /// <summary>
+        /// Processes the ACL for an object
+        /// </summary>
+        /// <param name="wrapper"></param>
+        /// <returns></returns>
         private static async Task<List<ACL>> ProcessDACL(LdapWrapper wrapper)
         {
             var aces = new List<ACL>();
+            //Grab the ntsecuritydescriptor attribute as bytes
             var ntSecurityDescriptor = wrapper.SearchResult.GetPropertyAsBytes("ntsecuritydescriptor");
 
             //If the NTSecurityDescriptor is null, something screwy is happening. Nothing to process here, so continue in the pipeline
             if (ntSecurityDescriptor == null)
                 return aces;
 
+            //Create a new ActiveDirectorySecurity object and set the bytes in to this value
             var descriptor = new ActiveDirectorySecurity();
             descriptor.SetSecurityDescriptorBinaryForm(ntSecurityDescriptor);
 
+            //Pre-process the sid of the object owner
             var ownerSid = FilterAceSids(descriptor.GetOwner(typeof(SecurityIdentifier)).Value);
             if (ownerSid != null)
             {
+                //Resolve the owner's SID to its corresponding type
                 var (finalSid, type) = await ResolutionHelpers.ResolveSidAndGetType(ownerSid, wrapper.Domain);
+                //If resolution worked, store the Owner ACE into our final result
                 if (finalSid != null)
                 {
                     aces.Add(new ACL
@@ -113,6 +141,7 @@ namespace SharpHound3.Tasks
                 //Ignore Null Aces
                 if (ace == null)
                     continue;
+
                 //Ignore deny aces
                 if (ace.AccessControlType == AccessControlType.Deny)
                     continue;
@@ -121,13 +150,19 @@ namespace SharpHound3.Tasks
                 if (!IsAceInherited(ace, BaseGuids[wrapper.GetType()]))
                     continue;
 
+                //Grab the sid of the principal on this ACE
                 var principalSid = FilterAceSids(ace.IdentityReference.Value);
 
                 if (principalSid == null)
                     continue;
 
+                //Resolve the principal's SID to its type
                 var (finalSid, type) = await ResolutionHelpers.ResolveSidAndGetType(principalSid, wrapper.Domain);
 
+                if (finalSid == null)
+                    continue;
+
+                //Start processing the rights in this ACE
                 var rights = ace.ActiveDirectoryRights;
                 var objectAceType = ace.ObjectType.ToString();
                 var isInherited = ace.IsInherited;
@@ -243,6 +278,7 @@ namespace SharpHound3.Tasks
                         }
                     }else if (wrapper is Computer)
                     {
+                        //Computer extended rights are important when the computer has LAPS
                         Helpers.GetDirectorySearcher(wrapper.Domain).GetAttributeFromGuid(objectAceType, out var mappedGuid);
                         if (wrapper.SearchResult.GetProperty("ms-mcs-admpwdexpirationtime") != null)
                         {
@@ -271,7 +307,7 @@ namespace SharpHound3.Tasks
                     }
                 }
 
-                //PropertyWrites apply to Groups, User, Computer
+                //PropertyWrites apply to Groups, User, Computer, GPO
                 //GenericWrite encapsulates WriteProperty, so we need to check them at the same time to avoid duplicate edges
                 if (rights.HasFlag(ActiveDirectoryRights.GenericWrite) ||
                     rights.HasFlag(ActiveDirectoryRights.WriteProperty))
@@ -379,6 +415,7 @@ namespace SharpHound3.Tasks
                 return null;
             }
 
+            //Return upcased SID
             return sid.ToUpper();
         }
     }

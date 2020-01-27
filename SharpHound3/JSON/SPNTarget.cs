@@ -2,6 +2,9 @@
 
 namespace SharpHound3.JSON
 {
+    /// <summary>
+    /// Represents a target on a host from a service principal name.
+    /// </summary>
     internal class SPNTarget : IEquatable<SPNTarget>
     {
         public string ComputerSid { get; set; }
