@@ -9,6 +9,10 @@ namespace SharpHound3
 {
     internal static class Extensions
     {
+        /// <summary>
+        /// Helper function to print attributes of a SearchResultEntry. Not used currently
+        /// </summary>
+        /// <param name="searchResultEntry"></param>
         public static void PrintEntry(this SearchResultEntry searchResultEntry)
         {
             foreach (var propertyName in searchResultEntry.Attributes.AttributeNames)
@@ -21,12 +25,19 @@ namespace SharpHound3
 
 
         #region SearchResultEntry
+        /// <summary>
+        /// Gets the specified property as a string from the SearchResultEntry
+        /// </summary>
+        /// <param name="searchResultEntry"></param>
+        /// <param name="property"></param>
+        /// <returns></returns>
         public static string GetProperty(this SearchResultEntry searchResultEntry, string property)
         {
             if (!searchResultEntry.Attributes.Contains(property))
                 return null;
 
             var collection = searchResultEntry.Attributes[property];
+            //Use getvalues to auto-convert to the proper type
             var lookups = collection.GetValues(typeof(string));
             if (lookups.Length == 0)
                 return null;
@@ -37,6 +48,11 @@ namespace SharpHound3
             return prop;
         }
 
+        /// <summary>
+        /// Gets the objectsid property as a string from the SearchResultEntry
+        /// </summary>
+        /// <param name="searchResultEntry"></param>
+        /// <returns></returns>
         public static string GetSid(this SearchResultEntry searchResultEntry)
         {
             try
@@ -75,6 +91,12 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Gets the specified property as a string array from the SearchResultEntry
+        /// </summary>
+        /// <param name="searchResultEntry"></param>
+        /// <param name="property"></param>
+        /// <returns></returns>
         public static string[] GetPropertyAsArray(this SearchResultEntry searchResultEntry, string property)
         {
             if (!searchResultEntry.Attributes.Contains(property))
@@ -89,6 +111,13 @@ namespace SharpHound3
             return result;
         }
 
+        /// <summary>
+        /// Gets the specified property as an array of byte arrays from the SearchResultEntry
+        /// Used for SIDHistory
+        /// </summary>
+        /// <param name="searchResultEntry"></param>
+        /// <param name="property"></param>
+        /// <returns></returns>
         public static byte[][] GetPropertyAsArrayOfBytes(this SearchResultEntry searchResultEntry, string property)
         {
             var list = new List<byte[]>();
@@ -104,6 +133,12 @@ namespace SharpHound3
             return result;
         }
 
+        /// <summary>
+        /// Gets the specified property as a byte array
+        /// </summary>
+        /// <param name="searchResultEntry"></param>
+        /// <param name="property"></param>
+        /// <returns></returns>
         public static byte[] GetPropertyAsBytes(this SearchResultEntry searchResultEntry, string property)
         {
             if (!searchResultEntry.Attributes.Contains(property))
@@ -120,6 +155,11 @@ namespace SharpHound3
             return bytes;
         }
 
+        /// <summary>
+        /// Gets the objectsid/objectguid
+        /// </summary>
+        /// <param name="searchResultEntry"></param>
+        /// <returns></returns>
         public static string GetObjectIdentifier(this SearchResultEntry searchResultEntry)
         {
             if (!searchResultEntry.Attributes.Contains("objectsid") &&
@@ -195,24 +235,5 @@ namespace SharpHound3
         }
 
         #endregion
-
-        public static bool HasFlag(this Enum self, Enum test)
-        {
-            if (self == null || test == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                var temp = Convert.ToInt32(self);
-                var num = Convert.ToInt32(test);
-                return (temp & num) == num;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
     }
 }

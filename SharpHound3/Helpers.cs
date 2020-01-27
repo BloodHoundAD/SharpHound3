@@ -49,17 +49,23 @@ namespace SharpHound3
             CancellationTokenSource.Cancel();
         }
 
+        /// <summary>
+        /// Set some variables, and clear the ping cache for a new run
+        /// </summary>
         internal static void StartNewRun()
         {
             PingCache.Clear();
             _currentLoopTime = $"{DateTime.Now:yyyyMMddHHmmss}";
         }
 
+        /// <summary>
+        /// Converts a string SID to its hex representation
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <returns></returns>
         internal static string ConvertSidToHexSid(string sid)
         {
-            var securityIdentifier = CreateSecurityIdentifier(sid);
-            if (securityIdentifier == null)
-                return null;
+            var securityIdentifier = new SecurityIdentifier(sid);
             var sidBytes = new byte[securityIdentifier.BinaryLength];
             securityIdentifier.GetBinaryForm(sidBytes, 0);
 
@@ -67,6 +73,11 @@ namespace SharpHound3
             return output;
         }
 
+        /// <summary>
+        /// Gets a domain name from a distinguished name
+        /// </summary>
+        /// <param name="distinguishedName"></param>
+        /// <returns></returns>
         internal static string DistinguishedNameToDomain(string distinguishedName)
         {
             var temp = distinguishedName.Substring(distinguishedName.IndexOf("DC=",
@@ -75,13 +86,11 @@ namespace SharpHound3
             return temp;
         }
 
-        internal static SecurityIdentifier CreateSecurityIdentifier(string sid)
-        {
-            
-            return new SecurityIdentifier(sid);
-            
-        }
-
+        /// <summary>
+        /// Tries to create a security identifier from a byte array
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <returns></returns>
         internal static SecurityIdentifier CreateSecurityIdentifier(byte[] sid)
         {
             try
@@ -96,6 +105,11 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Gets the name of the forest associate with the domain
+        /// </summary>
+        /// <param name="domain"></param>
+        /// <returns></returns>
         internal static string GetForestName(string domain=null)
         {
             try
@@ -113,6 +127,11 @@ namespace SharpHound3
             
         }
 
+        /// <summary>
+        /// Converts a SamAccountType property to the appropriate type enum
+        /// </summary>
+        /// <param name="samAccountType"></param>
+        /// <returns></returns>
         internal static LdapTypeEnum SamAccountTypeToType(string samAccountType)
         {
             if (Groups.Contains(samAccountType))
