@@ -20,9 +20,14 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Runs trust enumeration for a domain object
+        /// </summary>
+        /// <param name="domain"></param>
         private static void DoTrustEnumeration(Domain domain)
         {
             var searcher = Helpers.GetDirectorySearcher(domain.Domain);
+            //Query ldap for trusteddomain objects
             var trusts = searcher.QueryLdap("(objectclass=trusteddomain)", LookupProps, SearchScope.Subtree).Select(
                 trustedDomain =>
                 {

@@ -25,6 +25,7 @@ namespace SharpHound3.Tasks
             var domain = user.Domain;
             var resolved = new List<SPNTarget>();
 
+            //Loop over the spns, and look for any that start with mssqlsvc
             foreach (var spn in servicePrincipalNames.Where(x => x.StartsWith("mssqlsvc", StringComparison.OrdinalIgnoreCase)))
             {
                 int port;
@@ -39,6 +40,7 @@ namespace SharpHound3.Tasks
                     port = 1433;
                 }
 
+                //Try to turn the host into a SID
                 var hostSid = await ResolutionHelpers.ResolveHostToSid(spn, domain);
                 if (hostSid.StartsWith("S-1-5"))
                 {

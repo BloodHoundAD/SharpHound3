@@ -10,6 +10,9 @@ using SharpHound3.LdapWrappers;
 
 namespace SharpHound3.Tasks
 {
+    /// <summary>
+    /// Tasks to enumerate local groups on computers
+    /// </summary>
     internal class LocalGroupTasks
     {
         internal static async Task<LdapWrapper> GetLocalGroupMembers(LdapWrapper wrapper)
@@ -77,6 +80,7 @@ namespace SharpHound3.Tasks
             var groupMemberList = new List<GenericMember>();
             var task = Task.Run(() => CallLocalGroupApi(computer, rid, out sids));
 
+            //Run the API call along with a 10 second timeout
             if (await Task.WhenAny(task, Task.Delay(10000)) != task){
                 OutputTasks.AddComputerStatus(new ComputerStatus
                 {
@@ -87,6 +91,7 @@ namespace SharpHound3.Tasks
                 return groupMemberList;
             }
 
+            //Check the result of the task
             var taskResult = task.Result;
             if (!taskResult)
                 return groupMemberList;

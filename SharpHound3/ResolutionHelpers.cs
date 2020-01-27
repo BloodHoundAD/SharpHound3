@@ -135,7 +135,16 @@ namespace SharpHound3
 
             //All our direct attempts to resolve have failed. We'll try some DNS resolution now
             var resolver = Helpers.GetDNSResolver(normalizedDomain);
-            var resolvedHostName = (await resolver.GetHostEntryAsync(normalizedHostname))?.HostName;
+            string resolvedHostName;
+            try
+            {
+                resolvedHostName = (await resolver.GetHostEntryAsync(normalizedHostname))?.HostName;
+            }
+            catch
+            {
+                resolvedHostName = null;
+            }
+            
 
             if (resolvedHostName != null)
             {

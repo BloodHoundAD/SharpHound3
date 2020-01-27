@@ -11,14 +11,23 @@ using SharpHound3.LdapWrappers;
 
 namespace SharpHound3.Tasks
 {
+    /// <summary>
+    /// Tasks for privileged session enumeration
+    /// </summary>
     internal class LoggedOnTasks
     {
         private static readonly Regex SidRegex = new Regex(@"S-1-5-21-[0-9]+-[0-9]+-[0-9]+-[0-9]+$", RegexOptions.Compiled);
 
+        /// <summary>
+        /// Entrypoint for the pipeline
+        /// </summary>
+        /// <param name="wrapper"></param>
+        /// <returns></returns>
         internal static async Task<LdapWrapper> ProcessLoggedOn(LdapWrapper wrapper)
         {
             if (wrapper is Computer computer)
             {
+                //Make sure we're targetting a windows or non-contactable computer
                 if (computer.IsWindows && !computer.PingFailed)
                 {
                     var sessions = new List<Session>();
@@ -143,8 +152,10 @@ namespace SharpHound3.Tasks
             IEnumerable<string> filteredKeys;
             try
             {
+                //Try to open the remote base key
                 key = RegistryKey.OpenRemoteBaseKey(RegistryHive.Users, computer.APIName);
 
+                //Find subkeys where the regex matches
                 filteredKeys = key.GetSubKeyNames().Where(subkey => SidRegex.IsMatch(subkey));
             }
             catch (Exception e)

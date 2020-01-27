@@ -54,6 +54,7 @@ namespace SharpHound3.Tasks
             var searcher = Helpers.GetDirectorySearcher(target.Domain);
             var affectedComputers = new List<string>();
 
+            //If we've already grabbed the list of computers, use that list instead of fetching again
             if (target is Domain testDomain && testDomain.Computers.Length > 0)
             {
                 affectedComputers = new List<string>(testDomain.Computers);
@@ -63,6 +64,7 @@ namespace SharpHound3.Tasks
             }
             else
             {
+                //Grab all the computer objects affected by this object
                 foreach (var computerResult in searcher.QueryLdap("(samaccounttype=805306369)", new[] { "objectsid" },
                     SearchScope.Subtree, target.DistinguishedName))
                 {
@@ -74,11 +76,12 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            //If we have no computers, then theres no more processsing to do here.
+            //If we have no computers, then there's no more processing to do here.
             //Searching for computers is WAY less expensive than trying to parse the entire gplink structure first
             if (affectedComputers.Count == 0)
                 return;
 
+            //Grab the gplinks, and then split it
             var links = gpLinks.Split(']', '[').Where(link => link.StartsWith("LDAP", true, null)).ToList();
             var enforced = new List<string>();
             var unenforced = new List<string>();
@@ -116,33 +119,43 @@ namespace SharpHound3.Tasks
                     gpoDistinguishedName.Substring(gpoDistinguishedName.IndexOf("CN=",
                         StringComparison.OrdinalIgnoreCase));
 
+                //Check our cache to see if we've already processed this GPO before
                 if (!GpoActionCache.TryGetValue(gpoDistinguishedName, out var actions))
                 {
                     actions = new List<GroupAction>();
+
+                    //Get the domain name for the GPO
                     var gpoDomain = Helpers.DistinguishedNameToDomain(gpoDistinguishedName);
+
+                    //Get the gpcfilesyspath for the GPO
                     var gpoResult = await searcher.GetOne("(objectclass=*)", new[] {"gpcfilesyspath"}, SearchScope.Base,
                         gpoDistinguishedName);
 
                     var baseFilePath = gpoResult?.GetProperty("gpcfilesyspath");
 
+                    //If the basefilepath is null, ignore this GPO, it has no net effect
                     if (baseFilePath == null)
                     {
                         GpoActionCache.TryAdd(gpoDistinguishedName, actions);
                         continue;
                     }
 
+                    //Add the actions each GPO performs
                     actions.AddRange(await ProcessGPOXml(baseFilePath, gpoDomain));
                     actions.AddRange(await ProcessGPOTmpl(baseFilePath, gpoDomain));
                 }
 
+                //Cache the actions for later
                 GpoActionCache.TryAdd(gpoDistinguishedName, actions);
 
                 if (actions.Count == 0)
                     continue;
 
+                //Group the Members by their RID
                 var restrictedMemberSets = actions.Where(x => x.Target == GroupActionTarget.RestrictedMember)
                         .Select(x => (x.TargetRid, x.TargetSid, x.TargetType)).GroupBy(x => x.TargetRid);
 
+                //Loop over the member sets, and create Member references
                 foreach (var set in restrictedMemberSets)
                 {
                     var results = data[set.Key];
@@ -155,6 +168,7 @@ namespace SharpHound3.Tasks
                     data[set.Key] = results;
                 }
 
+                //Do the same for MemberOf
                 var restrictedMemberOfSets = actions.Where(x => x.Target == GroupActionTarget.RestrictedMemberOf)
                     .Select(x => (x.TargetRid, x.TargetSid, x.TargetType)).GroupBy(x => x.TargetRid);
 
@@ -170,25 +184,30 @@ namespace SharpHound3.Tasks
                     data[set.Key] = results;
                 }
 
+                //Group the LocalGroups by RID
                 var restrictedLocalGroupSets = actions.Where(x => x.Target == GroupActionTarget.LocalGroup)
                     .Select(x => (x.TargetRid, x.TargetSid, x.TargetType, x.Action)).GroupBy(x => x.TargetRid);
 
                 foreach (var set in restrictedLocalGroupSets)
                 {
                     var results = data[set.Key];
+                    //Loop over the results we split off
                     foreach (var (_, targetSid, targetType, action) in set)
                     {
                         var groupResults = results.LocalGroups;
+                        //If the operation is Delete, clear all the previously set groups
                         if (action == GroupActionOperation.DeleteGroups)
                         {
                             groupResults.RemoveAll(x => x.MemberType == LdapTypeEnum.Group);
                         }
 
+                        //Same operation, except for users
                         if (action == GroupActionOperation.DeleteUsers)
                         {
                             groupResults.RemoveAll(x => x.MemberType == LdapTypeEnum.User);
                         }
 
+                        //Add a member to the result set
                         if (action == GroupActionOperation.Add)
                         {
                             groupResults.Add(new GenericMember
@@ -198,6 +217,7 @@ namespace SharpHound3.Tasks
                             });
                         }
 
+                        //Delete all in this scenario
                         if (action == GroupActionOperation.Delete)
                         {
                             groupResults.RemoveAll(x => x.MemberId == targetSid);
@@ -212,12 +232,15 @@ namespace SharpHound3.Tasks
 
             if (target is Domain domain)
             {
+                //Loop through the data we've built from the different GPOs
                 foreach (var x in data)
                 {
                     var restrictedMember = x.Value.RestrictedMember;
                     var restrictedMemberOf = x.Value.RestrictedMemberOf;
                     var groupMember = x.Value.LocalGroups;
                     var finalMembers = new List<GenericMember>();
+
+                    //Put the distinct parts together
                     if (restrictedMember.Count > 0)
                     {
                         finalMembers.AddRange(restrictedMember);
@@ -229,10 +252,12 @@ namespace SharpHound3.Tasks
                         finalMembers.AddRange(groupMember);
                     }
 
+                    //Distinct the final members
                     finalMembers = finalMembers.Distinct().ToList();
                     if (finalMembers.Count > 0)
                         affectsComputers = true;
 
+                    //Set the appropriate variable on the Computer object
                     switch (x.Key)
                     {
                         case LocalGroupRids.Administrators:
@@ -303,30 +328,44 @@ namespace SharpHound3.Tasks
             }
         }
 
+        /// <summary>
+        /// Processes a gpo GptTmpl.inf file for the corresponding GPO
+        /// </summary>
+        /// <param name="basePath"></param>
+        /// <param name="gpoDomain"></param>
+        /// <returns>A list of localgroup "actions"</returns>
         private static async Task<List<GroupAction>> ProcessGPOTmpl(string basePath, string gpoDomain)
         {
             var actions = new List<GroupAction>();
             var templatePath = $"{basePath}\\MACHINE\\Microsoft\\Windows NT\\SecEdit\\GptTmpl.inf";
 
+            //Check the file exists
             if (File.Exists(templatePath))
             {
                 using (var reader = new StreamReader(new FileStream(templatePath, FileMode.Open, FileAccess.Read)))
                 {
+                    //Read the file, and read it to the end
                     var content = await reader.ReadToEndAsync();
+
+                    // Check if our regex matches
                     var memberMatch = MemberRegex.Match(content);
 
                     if (memberMatch.Success)
                     {
+                        //If we have a match, split the lines
                         var memberText = memberMatch.Groups[1].Value;
                         var memberLines = Regex.Split(memberText.Trim(), @"\r\n|\r|\n");
 
+                        //Loop over the lines that matched our regex
                         foreach (var memberLine in memberLines)
                         {
+                            //Check if the Key regex matches (S-1-5.*_memberof=blah)
                             var keyMatch = KeyRegex.Match(memberLine);
 
                             var key = keyMatch.Groups[1].Value.Trim();
                             var val = keyMatch.Groups[2].Value.Trim();
 
+                            //Figure out which pattern matches
                             var leftMatch = MemberLeftRegex.Match(key);
                             var rightMatches = MemberRightRegex.Matches(val);
 
@@ -337,9 +376,9 @@ namespace SharpHound3.Tasks
                                 var rid = int.Parse(extracted.Groups[1].Value);
                                 if (Enum.IsDefined(typeof(LocalGroupRids), rid))
                                 {
+                                    //Loop over the members in the match, and try to convert them to SIDs
                                     foreach (var member in val.Split(','))
                                     {
-
                                         var (success, sid, type) = await GetSid(member.Trim('*'), gpoDomain);
                                         if (!success)
                                             continue;
@@ -362,6 +401,7 @@ namespace SharpHound3.Tasks
                             {
                                 var sid = key.Trim('*').Substring(0, index - 3).ToUpper();
                                 var type= LdapTypeEnum.Unknown;
+                                //If the member starts with s-1-5, try to resolve the SID, else treat it as an account name
                                 if (!sid.StartsWith("S-1-5", StringComparison.OrdinalIgnoreCase))
                                 {
                                     var (success, aSid, lType) = await ResolutionHelpers.ResolveAccountNameToSidAndType(sid, gpoDomain);
@@ -379,7 +419,7 @@ namespace SharpHound3.Tasks
                                 if (sid == null || !sid.StartsWith("S-1-5", StringComparison.OrdinalIgnoreCase))
                                     continue;
 
-                                
+                                // Loop over matches and add the actions appropriately
                                 foreach (var match in rightMatches)
                                 {
                                     var rid = int.Parse(ExtractRid.Match(match.ToString()).Groups[1].Value);
@@ -404,24 +444,37 @@ namespace SharpHound3.Tasks
             return actions;
         }
 
+        /// <summary>
+        /// Parses a Groups.xml file
+        /// </summary>
+        /// <param name="basePath"></param>
+        /// <param name="gpoDomain"></param>
+        /// <returns>A list of GPO "Actions"</returns>
         private static async Task<List<GroupAction>> ProcessGPOXml(string basePath, string gpoDomain)
         {
             var actions = new List<GroupAction>();
             var xmlPath = $"{basePath}\\MACHINE\\Preferences\\Groups\\Groups.xml";
+            //Check if the file exists
             if (File.Exists(xmlPath))
             {
+                //Load the file into an XPathDocument
                 var doc = new XPathDocument(xmlPath);
                 var navigator = doc.CreateNavigator();
                 var groupsNodes = navigator.Select("/Groups");
+
+                //Move through the nodes
                 while (groupsNodes.MoveNext())
                 {
+                    //Check if this group is disabled
                     var disabled = groupsNodes.Current.GetAttribute("disabled", "") == "1";
                     if (disabled)
                         continue;
 
+                    //Loop over the individual Group Nodes
                     var groupNodes = groupsNodes.Current.Select("Group");
                     while (groupNodes.MoveNext())
                     {
+                        // Grab the Properties node
                         var groupProperties = groupNodes.Current.Select("Properties");
                         while (groupProperties.MoveNext())
                         {
@@ -431,6 +484,7 @@ namespace SharpHound3.Tasks
                             if (!action.Equals("u", StringComparison.OrdinalIgnoreCase))
                                 continue;
 
+                            //Get the groupsid/groupname attribute
                             var groupSid = currentProperties.GetAttribute("groupSid", "");
                             var groupName = currentProperties.GetAttribute("groupName", "");
                             LocalGroupRids? targetGroup = null;
@@ -492,6 +546,7 @@ namespace SharpHound3.Tasks
 
                             var members = currentProperties.Select("Members/Member");
 
+                            //Grab the member attributes
                             while (members.MoveNext())
                             {
                                 var memberAction = members.Current.GetAttribute("action", "").Equals("ADD", StringComparison.CurrentCulture) ? GroupActionOperation.Add : GroupActionOperation.Delete;
@@ -546,7 +601,13 @@ namespace SharpHound3.Tasks
 
             return actions;
         }
-
+        
+        /// <summary>
+        /// Resolves a SID to its type
+        /// </summary>
+        /// <param name="element"></param>
+        /// <param name="domainName"></param>
+        /// <returns></returns>
         private static async Task<(bool success, string sid, LdapTypeEnum type)> GetSid(string element, string domainName)
         {
             if (!element.StartsWith("S-1-", StringComparison.CurrentCulture))
@@ -590,13 +651,9 @@ namespace SharpHound3.Tasks
             return (true, element, lType);
         }
 
-        private class TempStorage
-        {
-            internal int GroupRID { get; set; }
-            internal string MemberSid { get; set; }
-            internal LdapTypeEnum MemberType { get; set; }
-        }
-
+        /// <summary>
+        /// Represents an action from a GPO
+        /// </summary>
         private class GroupAction
         {
             internal GroupActionOperation Action { get; set; }
@@ -611,6 +668,9 @@ namespace SharpHound3.Tasks
             }
         }
 
+        /// <summary>
+        /// Storage for each different group type
+        /// </summary>
         public class GroupResults
         {
             public List<GenericMember> RestrictedMemberOf = new List<GenericMember>();

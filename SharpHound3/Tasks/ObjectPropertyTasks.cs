@@ -14,6 +14,11 @@ namespace SharpHound3.Tasks
     {
         private static readonly DateTime WindowsEpoch = new DateTime(1970, 1, 1);
 
+        /// <summary>
+        /// Entrypoint for the pipeline
+        /// </summary>
+        /// <param name="wrapper"></param>
+        /// <returns></returns>
         internal static async Task<LdapWrapper> ResolveObjectProperties(LdapWrapper wrapper)
         {
             var result = wrapper.SearchResult;
@@ -42,7 +47,11 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
-        private static void ParseGroupProperties(Group wrapper)
+        /// <summary>
+        /// Grab properties from Group objects
+        /// </summary>
+        /// <param name="wrapper"></param>
+        private static void ParseGroupProperties(LdapWrapper wrapper)
         {
             var result = wrapper.SearchResult;
 
@@ -58,6 +67,10 @@ namespace SharpHound3.Tasks
             }
         }   
 
+        /// <summary>
+        /// Grab properties from GPO objects
+        /// </summary>
+        /// <param name="wrapper"></param>
         private static void ParseGPOProperties(GPO wrapper)
         {
             var result = wrapper.SearchResult;
@@ -70,6 +83,11 @@ namespace SharpHound3.Tasks
             //var result = wrapper.SearchResult;
         }
 
+        /// <summary>
+        /// Grabs properties from Computer objects
+        /// </summary>
+        /// <param name="wrapper"></param>
+        /// <returns></returns>
         private static async Task ParseComputerProperties(Computer wrapper)
         {
             var result = wrapper.SearchResult;
@@ -154,9 +172,14 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("operatingsystem", os);
         }
 
+        /// <summary>
+        /// Grabs properties from Domain objects
+        /// </summary>
+        /// <param name="wrapper"></param>
         private static void ParseDomainProperties(Domain wrapper)
         {
             var result = wrapper.SearchResult;
+            // msds-behavior-version gives us the domain functional level
             if (!int.TryParse(result.GetProperty("msds-behavior-version"), out var level)) level = -1;
             string func;
             switch (level)
@@ -192,6 +215,11 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("functionallevel", func);
         }
 
+        /// <summary>
+        /// Grab properties from User objects
+        /// </summary>
+        /// <param name="wrapper"></param>
+        /// <returns></returns>
         private static async Task ParseUserProperties(User wrapper)
         {
             var result = wrapper.SearchResult;
@@ -284,6 +312,11 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("sidhistory", sidHistoryList.ToArray());
         }
 
+        /// <summary>
+        /// Converts a windows timestamp into unix epoch time
+        /// </summary>
+        /// <param name="ldapTime"></param>
+        /// <returns></returns>
         private static long ConvertToUnixEpoch(string ldapTime)
         {
             if (ldapTime == null)

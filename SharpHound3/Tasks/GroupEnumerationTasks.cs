@@ -9,12 +9,18 @@ using SharpHound3.LdapWrappers;
 
 namespace SharpHound3.Tasks
 {
+    /// <summary>
+    /// Tasks to resolve members of groups and the primary group info for computers/users
+    /// </summary>
     internal class GroupEnumerationTasks
     {
         private static readonly Cache AppCache = Cache.Instance;
-        //These are the properties required to do the appropriate lookups for group membership translations
-        internal static readonly string[] LookupProps = { "samaccounttype", "objectsid", "objectclass" };
-
+        
+        /// <summary>
+        /// Entrypoint for the pipeline
+        /// </summary>
+        /// <param name="wrapper"></param>
+        /// <returns></returns>
         internal static async Task<LdapWrapper> ProcessGroupMembership(LdapWrapper wrapper)
         {
             if (wrapper is Group group)
@@ -29,12 +35,21 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Gets the primary group info for users/computers
+        /// </summary>
+        /// <param name="wrapper"></param>
         private static void GetPrimaryGroupInfo(LdapWrapper wrapper)
         {
+            //Grab the primarygroupid attribute
             var primaryGroupId = wrapper.SearchResult.GetProperty("primarygroupid");
             if (primaryGroupId == null)
                 return;
+
+            //Grab the domain sid from the wrapper instead of querying LDAP
             var domainSid = wrapper.ObjectIdentifier.Substring(0, wrapper.ObjectIdentifier.LastIndexOf("-", StringComparison.Ordinal));
+
+            //Append the primarygroupid to the domainsid
             var primaryGroupSid = $"{domainSid}-{primaryGroupId}";
 
             if (wrapper is Computer c)
@@ -47,6 +62,11 @@ namespace SharpHound3.Tasks
             }
         }
 
+        /// <summary>
+        /// Gets the members of a group
+        /// </summary>
+        /// <param name="group"></param>
+        /// <returns></returns>
         private static async Task GetGroupMembership(Group group)
         {
             var finalMembers = new List<GenericMember>();
@@ -68,6 +88,7 @@ namespace SharpHound3.Tasks
                 //Lets try ranged retrieval here
                 var searcher = Helpers.GetDirectorySearcher(group.Domain);
                 var range = await searcher.RangedRetrievalAsync(group.DistinguishedName, "member");
+
                 //If we get null back, then something went wrong.
                 if (range == null)
                 {
@@ -105,8 +126,10 @@ namespace SharpHound3.Tasks
             }
             else
             {
+                //We got our members back
                 foreach (var groupMemberDistinguishedName in groupMembers)
                 {
+                    //Resolve DistinguishedNames to SIDS
                     var (sid, type) = await ResolutionHelpers.ResolveDistinguishedName(groupMemberDistinguishedName);
                     if (sid == null)
                         sid = groupMemberDistinguishedName;

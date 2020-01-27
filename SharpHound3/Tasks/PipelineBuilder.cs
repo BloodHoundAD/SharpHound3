@@ -8,6 +8,9 @@ using SharpHound3.Producers;
 
 namespace SharpHound3.Tasks
 {
+    /// <summary>
+    /// Creates the enumeration pipeline
+    /// </summary>
     internal class PipelineBuilder
     {
         internal static Task GetBasePipelineForDomain(string domain)
