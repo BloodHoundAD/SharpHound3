@@ -374,9 +374,9 @@ namespace SharpHound3
         /// </summary>
         /// <param name="filename"></param>
         /// <param name="extension"></param>
-        /// <param name="addTime"></param>
+        /// <param name="addTimestamp"></param>
         /// <returns></returns>
-        internal static string ResolveFileName(string filename, string extension, bool addTime)
+        internal static string ResolveFileName(string filename, string extension, bool addTimestamp)
         {
             var finalFilename = filename;
             if (!filename.EndsWith(extension))
@@ -384,10 +384,10 @@ namespace SharpHound3
 
             if ((extension == "json" || extension == "zip") && Options.Instance.RandomizeFilenames)
             {
-                finalFilename = $"{Path.GetRandomFileName()}.{extension}";
+                finalFilename = $"{Path.GetRandomFileName()}";
             }
 
-            if (addTime)
+            if (addTimestamp)
             {
                 finalFilename = $"{_currentLoopTime}_{finalFilename}";
             }
