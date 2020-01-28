@@ -44,7 +44,7 @@ namespace SharpHound3.Tasks
                 var hostSid = await ResolutionHelpers.ResolveHostToSid(spn, domain);
                 if (hostSid.StartsWith("S-1-5"))
                 {
-                   resolved.Add(new SPNTarget
+                    resolved.Add(new SPNTarget
                     {
                         ComputerSid = hostSid,
                         Port = port,

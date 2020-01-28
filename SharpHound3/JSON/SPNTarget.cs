@@ -22,8 +22,8 @@ namespace SharpHound3.JSON
         {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != this.GetType()) return false;
-            return Equals((SPNTarget) obj);
+            if (obj.GetType() != GetType()) return false;
+            return Equals((SPNTarget)obj);
         }
 
         public override int GetHashCode()

@@ -22,14 +22,15 @@ namespace SharpHound3.Tasks
             if (options.Stealth)
             {
                 producer = new StealthProducer(domain, ldapVariables.LdapFilter, ldapVariables.LdapProperties);
-            }else if (options.ComputerFile != null)
+            }
+            else if (options.ComputerFile != null)
             {
                 producer = new ComputerFileProducer(domain, null, ldapVariables.LdapProperties);
             }
             else
             {
                 producer = new LdapProducer(domain, ldapVariables.LdapFilter, ldapVariables.LdapProperties);
-            }  
+            }
 
             var linkOptions = new DataflowLinkOptions
             {

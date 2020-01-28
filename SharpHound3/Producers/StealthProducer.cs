@@ -70,7 +70,7 @@ namespace SharpHound3.Producers
                         Console.WriteLine("[-] Terminating Producer as cancellation was requested. Waiting for pipeline to finish");
                         break;
                     }
-                        
+
                     await queue.SendAsync(searchResult);
                 }
                 queue.Complete();
@@ -105,24 +105,24 @@ namespace SharpHound3.Producers
             //Request user objects with the "homedirectory", "scriptpath", or "profilepath" attributes
             Parallel.ForEach(Searcher.QueryLdap(
                 "(&(samAccountType=805306368)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(|(homedirectory=*)(scriptpath=*)(profilepath=*)))",
-                new[] {"homedirectory", "scriptpath", "profilepath"}, SearchScope.Subtree), (searchResult) =>
-            {
+                new[] { "homedirectory", "scriptpath", "profilepath" }, SearchScope.Subtree), (searchResult) =>
+              {
                 //Grab any properties that exist, filter out null values
                 var poss = new[]
-                {
+                  {
                     searchResult.GetProperty("homedirectory"), searchResult.GetProperty("scriptpath"),
                     searchResult.GetProperty("profilepath")
-                }.Where(s => s != null);
+                  }.Where(s => s != null);
 
                 // Loop over each possibility, and grab the hostname from the path, adding it to a list
                 foreach (var s in poss)
-                {
-                    var split = s?.Split('\\');
-                    if (!(split?.Length >= 3)) continue;
-                    var path = split[2];
-                    paths.TryAdd(path, new byte());
-                }
-            });
+                  {
+                      var split = s?.Split('\\');
+                      if (!(split?.Length >= 3)) continue;
+                      var path = split[2];
+                      paths.TryAdd(path, new byte());
+                  }
+              });
 
 
             // Loop over the paths we grabbed, and resolve them to sids.

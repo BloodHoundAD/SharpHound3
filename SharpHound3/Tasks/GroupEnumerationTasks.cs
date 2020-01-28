@@ -15,7 +15,7 @@ namespace SharpHound3.Tasks
     internal class GroupEnumerationTasks
     {
         private static readonly Cache AppCache = Cache.Instance;
-        
+
         /// <summary>
         /// Entrypoint for the pipeline
         /// </summary>

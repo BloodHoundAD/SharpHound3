@@ -13,7 +13,7 @@ namespace SharpHound3
         internal TimeSpan defaultTimeSpan = TimeSpan.FromHours(8);
 
         //Collection Options
-        [Option('c', "CollectionMethod", Default = new[] { "Default"}, HelpText = "Collection Methods: Group, LocalGroup, GPOLocalGroup, Session, LoggedOn, ComputerOnly, Trusts, Default, RDP, DCOM")]
+        [Option('c', "CollectionMethod", Default = new[] { "Default" }, HelpText = "Collection Methods: Group, LocalGroup, GPOLocalGroup, Session, LoggedOn, ComputerOnly, Trusts, Default, RDP, DCOM")]
         public IEnumerable<string> CollectionMethods { get; set; }
 
         [Option(HelpText = "Use Stealth Targetting/Enumeration Options", Default = false)]
@@ -88,7 +88,7 @@ namespace SharpHound3
         [Option(HelpText = "Skip SMB port checks when connecting to computers", Default = false)]
         public bool SkipPortScan { get; set; }
 
-        [Option(HelpText="Timeout for SMB port check", Default = 2000)]
+        [Option(HelpText = "Timeout for SMB port check", Default = 2000)]
         public int PortScanTimeout { get; set; }
 
         [Option(HelpText = "Exclude domain controllers from enumeration (useful to avoid Microsoft ATP/ATA)", Default = false)]
@@ -152,7 +152,7 @@ namespace SharpHound3
                 try
                 {
                     option =
-                        (CollectionMethodOptions) Enum.Parse(typeof(CollectionMethodOptions), baseString, true);
+                        (CollectionMethodOptions)Enum.Parse(typeof(CollectionMethodOptions), baseString, true);
                 }
                 catch
                 {
@@ -231,7 +231,7 @@ namespace SharpHound3
                 }
             }
 
-            
+
             if (Stealth)
             {
                 var updates = new List<string>();

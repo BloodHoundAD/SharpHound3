@@ -43,7 +43,7 @@ namespace SharpHound3.Producers
 
                     string sid;
                     if (!computer.StartsWith("S-1-5-21"))
-                    { 
+                    {
                         //The computer isn't a SID so try to convert it to one
                         sid = await ResolutionHelpers.ResolveHostToSid(computer, DomainName);
                     }
@@ -78,6 +78,6 @@ namespace SharpHound3.Producers
             queue.Complete();
         }
 
-        
+
     }
 }

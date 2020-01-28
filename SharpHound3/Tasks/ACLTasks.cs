@@ -63,12 +63,12 @@ namespace SharpHound3.Tasks
             descriptor.SetSecurityDescriptorBinaryForm(securityDescriptor);
 
             // Loop over the entries in the security descriptor
-            foreach (ActiveDirectoryAccessRule ace in descriptor.GetAccessRules(true,true, typeof(SecurityIdentifier)))
+            foreach (ActiveDirectoryAccessRule ace in descriptor.GetAccessRules(true, true, typeof(SecurityIdentifier)))
             {
                 //Ignore null aces
                 if (ace == null)
                     continue;
-                
+
                 //Ignore deny aces (although this should never show up in GMSAs
                 if (ace.AccessControlType == AccessControlType.Deny)
                     continue;
@@ -250,7 +250,8 @@ namespace SharpHound3.Tasks
                                 });
                                 break;
                         }
-                    }else if (wrapper is User)
+                    }
+                    else if (wrapper is User)
                     {
                         switch (objectAceType)
                         {
@@ -276,7 +277,8 @@ namespace SharpHound3.Tasks
                                 });
                                 break;
                         }
-                    }else if (wrapper is Computer)
+                    }
+                    else if (wrapper is Computer)
                     {
                         //Computer extended rights are important when the computer has LAPS
                         Helpers.GetDirectorySearcher(wrapper.Domain).GetAttributeFromGuid(objectAceType, out var mappedGuid);
@@ -292,7 +294,8 @@ namespace SharpHound3.Tasks
                                     PrincipalType = type,
                                     IsInherited = isInherited
                                 });
-                            }else if (mappedGuid != null && mappedGuid == "ms-Mcs-AdmPwd")
+                            }
+                            else if (mappedGuid != null && mappedGuid == "ms-Mcs-AdmPwd")
                             {
                                 aces.Add(new ACL
                                 {
@@ -326,7 +329,7 @@ namespace SharpHound3.Tasks
                             });
                         }
                     }
-                    
+
                     if (wrapper is User)
                     {
                         if (objectAceType == "f3a64788-5306-11d1-a9c5-0000f80367c1")
@@ -340,7 +343,8 @@ namespace SharpHound3.Tasks
                                 IsInherited = isInherited
                             });
                         }
-                    }else if (wrapper is Group)
+                    }
+                    else if (wrapper is Group)
                     {
                         if (objectAceType == "bf9679c0-0de6-11d0-a285-00aa003049e2")
                         {
@@ -353,7 +357,8 @@ namespace SharpHound3.Tasks
                                 IsInherited = isInherited
                             });
                         }
-                    }else if (wrapper is Computer)
+                    }
+                    else if (wrapper is Computer)
                     {
                         if (objectAceType == "3f78c3e5-f79a-46bd-a0b8-9d18116ddc79")
                         {
@@ -408,7 +413,7 @@ namespace SharpHound3.Tasks
         /// <param name="objectDomain"></param>
         /// <returns></returns>
         private static string FilterAceSids(string sid)
-        { 
+        {
             //Ignore Local System/Creator Owner/Principal Self
             if (sid == "S-1-5-18" || sid == "S-1-3-0" || sid == "S-1-5-10")
             {

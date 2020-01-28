@@ -59,7 +59,8 @@ namespace SharpHound3.Tasks
                     if (objectClasses == null)
                     {
                         objectType = LdapTypeEnum.Unknown;
-                    }else if (objectClasses.Contains("groupPolicyContainer"))
+                    }
+                    else if (objectClasses.Contains("groupPolicyContainer"))
                     {
                         objectType = LdapTypeEnum.GPO;
                     }
@@ -82,7 +83,7 @@ namespace SharpHound3.Tasks
                 objectType = LdapTypeEnum.User;
                 accountName = accountName?.TrimEnd('$');
             }
-            
+
             //Depending on the object type, create the appropriate wrapper object
             switch (objectType)
             {

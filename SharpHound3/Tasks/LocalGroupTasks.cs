@@ -35,7 +35,7 @@ namespace SharpHound3.Tasks
                     computer.LocalAdmins = temp.ToArray();
                     await Helpers.DoDelay();
                 }
-                
+
                 if ((opts & CollectionMethodResolved.RDP) != 0)
                 {
                     var temp = computer.RemoteDesktopUsers.ToList();
@@ -43,7 +43,7 @@ namespace SharpHound3.Tasks
                     computer.RemoteDesktopUsers = temp.ToArray();
                     await Helpers.DoDelay();
                 }
-                    
+
 
                 if ((opts & CollectionMethodResolved.PSRemote) != 0)
                 {
@@ -81,7 +81,8 @@ namespace SharpHound3.Tasks
             var task = Task.Run(() => CallLocalGroupApi(computer, rid, out sids));
 
             //Run the API call along with a 10 second timeout
-            if (await Task.WhenAny(task, Task.Delay(10000)) != task){
+            if (await Task.WhenAny(task, Task.Delay(10000)) != task)
+            {
                 OutputTasks.AddComputerStatus(new ComputerStatus
                 {
                     ComputerName = computer.DisplayName,
@@ -131,9 +132,9 @@ namespace SharpHound3.Tasks
 
             // The first account in our list should always be the default RID 500 for the machine, but we'll take some extra precautions
             var machineSid = convertedSids.DefaultIfEmpty("DUMMYSTRING").FirstOrDefault(x => x.EndsWith("-500") && !x.StartsWith(domainSid)) ?? "DUMMYSTRING";
-            
+
             //If we found a machine sid, strip the ending bit off
-            if (machineSid.StartsWith("S-1-5-21")) 
+            if (machineSid.StartsWith("S-1-5-21"))
                 machineSid = machineSid.Substring(0, machineSid.LastIndexOf('-'));
 
             foreach (var sid in convertedSids)
@@ -173,7 +174,7 @@ namespace SharpHound3.Tasks
             var aliasHandle = IntPtr.Zero;
             var members = IntPtr.Zero;
             sids = new IntPtr[0];
-            
+
             //Create some objects required for SAMRPC calls
             var server = new UNICODE_STRING(computer.APIName);
             var objectAttributes = new OBJECT_ATTRIBUTES();
@@ -194,7 +195,7 @@ namespace SharpHound3.Tasks
                                 Status = status.ToString(),
                                 Task = $"GetNetLocalGroup-{rid}"
                             });
-                        
+
                         return false;
                     case NtStatus.StatusSuccess:
                         break;

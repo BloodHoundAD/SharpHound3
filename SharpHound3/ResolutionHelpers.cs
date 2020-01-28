@@ -21,7 +21,7 @@ namespace SharpHound3
         private static readonly ConcurrentDictionary<string, string> HostResolutionMap = new ConcurrentDictionary<string, string>();
         private static readonly Cache AppCache = Cache.Instance;
         private static readonly string[] GroupMembershipLookupProps = { "samaccounttype", "objectsid", "objectclass" };
-        private static readonly string[] OUGuidLookupProps = {"objectguid"};
+        private static readonly string[] OUGuidLookupProps = { "objectguid" };
         private static readonly string[] ResolutionProps = { "samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname" };
 
         // The following byte stream contains the necessary message
@@ -56,7 +56,7 @@ namespace SharpHound3
         {
             // Strip SPN prefixes/suffixes, transform to upper case and trim $ from the end
             var normalizedHostname = Helpers.StripSPN(hostname).ToUpper().TrimEnd('$');
-            
+
             if (HostResolutionMap.TryGetValue(normalizedHostname, out var resolvedHost))
                 return resolvedHost;
 
@@ -144,7 +144,7 @@ namespace SharpHound3
             {
                 resolvedHostName = null;
             }
-            
+
 
             if (resolvedHostName != null)
             {
@@ -194,7 +194,7 @@ namespace SharpHound3
             var computerName = Options.Instance.DomainController ?? GetDomainControllerForDomain(domainName);
 
             var result = DsGetDcName(computerName, domainName, null, null,
-                (uint) (DSGETDCNAME_FLAGS.DS_IS_FLAT_NAME | DSGETDCNAME_FLAGS.DS_RETURN_DNS_NAME),
+                (uint)(DSGETDCNAME_FLAGS.DS_IS_FLAT_NAME | DSGETDCNAME_FLAGS.DS_RETURN_DNS_NAME),
                 out var pDomainControllerInfo);
 
             try
@@ -226,7 +226,7 @@ namespace SharpHound3
             if (DomainControllerCache.TryGetValue(key, out var domainController))
                 return domainController;
 
-            var result = DsGetDcName(null, domainName, null, null, (uint) DSGETDCNAME_FLAGS.DS_DIRECTORY_SERVICE_PREFERRED,
+            var result = DsGetDcName(null, domainName, null, null, (uint)DSGETDCNAME_FLAGS.DS_DIRECTORY_SERVICE_PREFERRED,
                 out var pDomainControllerInfo);
 
             try
@@ -343,8 +343,8 @@ namespace SharpHound3
             {
                 //ForeignSecurityPrincipals generally contain the SID of the object, so we'll extract it and try resolving the SID type
                 var sid = distinguishedName.Split(',')[0].Substring(3);
-                
-                if (!sid.Contains("S-1-5")) 
+
+                if (!sid.Contains("S-1-5"))
                     return (null, LdapTypeEnum.Unknown);
 
                 var (finalSid, type) = await ResolveSidAndGetType(sid, domain);
@@ -447,7 +447,7 @@ namespace SharpHound3
             {
                 var securityIdentifier = new SecurityIdentifier(sid);
                 var sidBytes = new byte[securityIdentifier.BinaryLength];
-                securityIdentifier.GetBinaryForm(sidBytes,0);
+                securityIdentifier.GetBinaryForm(sidBytes, 0);
                 var output = $"\\{BitConverter.ToString(sidBytes).Replace('-', '\\')}";
                 return output;
             }

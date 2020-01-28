@@ -20,7 +20,8 @@ namespace SharpHound3.Tasks
             if (wrapper is OU ou)
             {
                 await ProcessOUObject(ou);
-            }else if (wrapper is Domain domain)
+            }
+            else if (wrapper is Domain domain)
             {
                 await ProcessDomainObject(domain);
             }
@@ -86,7 +87,7 @@ namespace SharpHound3.Tasks
             //Search for descendant objects with the OneLevel specification
             foreach (var containedObject in searcher.QueryLdap(
                 "(|(samAccountType=805306368)(samAccountType=805306369)(objectclass=organizationalUnit))", Helpers.ResolutionProps, SearchScope.OneLevel, domain.DistinguishedName))
-            { 
+            {
                 //Grab the type of the object found
                 var type = containedObject.GetLdapType();
 

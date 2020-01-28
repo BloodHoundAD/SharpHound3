@@ -54,7 +54,7 @@ namespace SharpHound3.Tasks
             var resumeHandle = 0;
             var workstationInfoType = typeof(WKSTA_USER_INFO_1);
             var ptrInfo = IntPtr.Zero;
-            var entriesRead  = 0;
+            var entriesRead = 0;
             var sessionList = new List<Session>();
 
             try
@@ -83,12 +83,12 @@ namespace SharpHound3.Tasks
                         OutputTasks.AddComputerStatus(new ComputerStatus
                         {
                             ComputerName = computer.DisplayName,
-                            Status = ((NetApiStatus) taskResult).ToString(),
+                            Status = ((NetApiStatus)taskResult).ToString(),
                             Task = "NetWkstaUserEnum"
                         });
                     return sessionList;
                 }
-                
+
                 var iterator = ptrInfo;
 
                 if (Options.Instance.DumpComputerStatus)
@@ -101,8 +101,8 @@ namespace SharpHound3.Tasks
 
                 for (var i = 0; i < entriesRead; i++)
                 {
-                    var data = (WKSTA_USER_INFO_1) Marshal.PtrToStructure(iterator, workstationInfoType);
-                    iterator = (IntPtr) (iterator.ToInt64() + Marshal.SizeOf(workstationInfoType));
+                    var data = (WKSTA_USER_INFO_1)Marshal.PtrToStructure(iterator, workstationInfoType);
+                    iterator = (IntPtr)(iterator.ToInt64() + Marshal.SizeOf(workstationInfoType));
 
                     var domain = data.wkui1_logon_domain;
                     var username = data.wkui1_username;
@@ -110,7 +110,7 @@ namespace SharpHound3.Tasks
                     //Remove local accounts
                     if (domain.Equals(computer.SamAccountName, StringComparison.CurrentCultureIgnoreCase))
                         continue;
-                    
+
                     //Remove blank accounts and computer accounts
                     if (username.Trim() == "" || username.EndsWith("$"))
                         continue;

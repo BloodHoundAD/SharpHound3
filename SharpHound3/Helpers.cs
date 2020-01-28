@@ -33,7 +33,7 @@ namespace SharpHound3
         private static readonly CancellationTokenSource CancellationTokenSource = new CancellationTokenSource();
         private static readonly Regex DCReplaceRegex = new Regex("DC=", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        internal static readonly string[] ResolutionProps = {"samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname"};
+        internal static readonly string[] ResolutionProps = { "samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname" };
 
         private static readonly Regex SPNRegex = new Regex(@".*\/.*", RegexOptions.Compiled);
         private static readonly string ProcStartTime = $"{DateTime.Now:yyyyMMddHHmmss}";
@@ -110,7 +110,7 @@ namespace SharpHound3
         /// </summary>
         /// <param name="domain"></param>
         /// <returns></returns>
-        internal static string GetForestName(string domain=null)
+        internal static string GetForestName(string domain = null)
         {
             try
             {
@@ -124,7 +124,7 @@ namespace SharpHound3
             {
                 return domain;
             }
-            
+
         }
 
         /// <summary>
@@ -191,7 +191,7 @@ namespace SharpHound3
 
             return sid;
         }
-        
+
         /// <summary>
         /// Gets a DNS Resolver for a domain, pointing DNS to a DC with port 53 open
         /// </summary>
@@ -207,7 +207,7 @@ namespace SharpHound3
 
             // Create a new resolver object which will auto populate with our local nameservers
             resolver = new LookupClient();
-            
+
             var newServerList = new List<IPEndPoint>();
 
             // Try to find a DC in our target domain that has 53 open
@@ -242,9 +242,9 @@ namespace SharpHound3
             //Find all DCs in the target domain
             foreach (var result in searcher.QueryLdap(
                 "(&(objectclass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))",
-                new[] {"samaccountname", "dnshostname"}, SearchScope.Subtree))
+                new[] { "samaccountname", "dnshostname" }, SearchScope.Subtree))
             {
-                
+
                 target = result.GetProperty("dnshostname") ?? result.GetProperty("samaccountname");
                 if (target == null)
                     continue;
@@ -275,7 +275,7 @@ namespace SharpHound3
                 return;
             }
 
-            var percent = (int) Math.Floor((double) (opts.Jitter * (opts.Throttle / 100)));
+            var percent = (int)Math.Floor((double)(opts.Jitter * (opts.Throttle / 100)));
             var delay = opts.Throttle + RandomGen.Next(-percent, percent);
             await Task.Delay(delay);
         }
@@ -342,7 +342,7 @@ namespace SharpHound3
 
             return resolved.ToUpper();
         }
-        
+
         /// <summary>
         /// Creates a filename for the looped results which will contain the results of all loops
         /// </summary>
@@ -351,7 +351,7 @@ namespace SharpHound3
         {
             var options = Options.Instance;
             var finalFilename = options.ZipFilename == null ? "BloodHoundLoopResults.zip" : $"{options.ZipFilename}.zip";
-            
+
             if (options.RandomizeFilenames)
             {
                 finalFilename = $"{Path.GetRandomFileName()}.zip";
@@ -421,7 +421,7 @@ namespace SharpHound3
             uint level,
             out IntPtr bufPtr);
 
-        #pragma warning disable 649
+#pragma warning disable 649
         private struct WorkstationInfo100
         {
 
@@ -433,7 +433,7 @@ namespace SharpHound3
             public int ver_major;
             public int ver_minor;
         }
-        #pragma warning restore 649
+#pragma warning restore 649
 
         [DllImport("Netapi32.dll", SetLastError = true)]
         private static extern int NetApiBufferFree(IntPtr Buffer);
@@ -557,7 +557,7 @@ namespace SharpHound3
         private static extern bool LookupAccountName(string systemName, string accountName,
             [MarshalAs(UnmanagedType.LPArray)] byte[] Sid, ref uint sidLength, StringBuilder domainName,
             ref uint domainNameLength, out SID_NAME_USE type);
-        
+
         private enum SID_NAME_USE
         {
             SidTypeUser = 1,

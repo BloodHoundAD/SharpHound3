@@ -30,8 +30,8 @@ namespace SharpHound3
         {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != this.GetType()) return false;
-            return Equals((UserDomainKey) obj);
+            if (obj.GetType() != GetType()) return false;
+            return Equals((UserDomainKey)obj);
         }
 
         public override int GetHashCode()

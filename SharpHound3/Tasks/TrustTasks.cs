@@ -8,7 +8,7 @@ namespace SharpHound3.Tasks
 {
     internal class TrustTasks
     {
-        private static readonly string[] LookupProps = {"trustattributes", "securityidentifier", "trustdirection", "trusttype", "cn"};
+        private static readonly string[] LookupProps = { "trustattributes", "securityidentifier", "trustdirection", "trusttype", "cn" };
 
         internal static LdapWrapper ResolveDomainTrusts(LdapWrapper wrapper)
         {
@@ -16,7 +16,7 @@ namespace SharpHound3.Tasks
             {
                 DoTrustEnumeration(domain);
             }
-            
+
             return wrapper;
         }
 
@@ -49,11 +49,13 @@ namespace SharpHound3.Tasks
                     if ((trustAttributes & TrustAttributes.WithinForest) != 0)
                     {
                         trustType = TrustType.ParentChild;
-                    }else if ((trustAttributes & TrustAttributes.ForestTransitive) != 0)
+                    }
+                    else if ((trustAttributes & TrustAttributes.ForestTransitive) != 0)
                     {
                         trustType = TrustType.Forest;
-                    }else if ((trustAttributes & TrustAttributes.TreatAsExternal) != 0 ||
-                              (trustAttributes & TrustAttributes.CrossOrganization) != 0)
+                    }
+                    else if ((trustAttributes & TrustAttributes.TreatAsExternal) != 0 ||
+                             (trustAttributes & TrustAttributes.CrossOrganization) != 0)
                     {
                         trustType = TrustType.External;
                     }

@@ -18,7 +18,7 @@ namespace SharpHound3.LdapWrappers
             LocalAdmins = new GenericMember[0];
             RemoteDesktopUsers = new GenericMember[0];
             DcomUsers = new GenericMember[0];
-            PSRemoteUsers= new GenericMember[0];
+            PSRemoteUsers = new GenericMember[0];
             IsStealthTarget = false;
             IsDomainController = false;
             IsWindows = true;

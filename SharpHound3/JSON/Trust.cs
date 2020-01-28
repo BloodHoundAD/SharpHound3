@@ -6,7 +6,7 @@ namespace SharpHound3.JSON
     /// Represents a domain trust
     /// </summary>
     public class Trust
-    {   
+    {
         [JsonProperty]
         internal string TargetDomainSid { get; set; }
         [JsonProperty]

@@ -27,19 +27,24 @@ namespace SharpHound3.Tasks
             if (wrapper is Domain domain)
             {
                 ParseDomainProperties(domain);
-            }else if (wrapper is Computer computer)
+            }
+            else if (wrapper is Computer computer)
             {
                 await ParseComputerProperties(computer);
-            }else if (wrapper is User user)
+            }
+            else if (wrapper is User user)
             {
                 await ParseUserProperties(user);
-            }else if (wrapper is GPO gpo)
+            }
+            else if (wrapper is GPO gpo)
             {
                 ParseGPOProperties(gpo);
-            }else if (wrapper is OU ou)
+            }
+            else if (wrapper is OU ou)
             {
                 ParseOUProperties(ou);
-            }else if (wrapper is Group group)
+            }
+            else if (wrapper is Group group)
             {
                 ParseGroupProperties(group);
             }
@@ -65,7 +70,7 @@ namespace SharpHound3.Tasks
             {
                 wrapper.Properties.Add("admincount", false);
             }
-        }   
+        }
 
         /// <summary>
         /// Grab properties from GPO objects
@@ -101,7 +106,7 @@ namespace SharpHound3.Tasks
                 var uacFlags = (UacFlags)baseFlags;
                 enabled = (uacFlags & UacFlags.AccountDisable) == 0;
                 trustedToAuth = (uacFlags & UacFlags.TrustedToAuthForDelegation) != 0;
-                unconstrained = (uacFlags & UacFlags.TrustedForDelegation) != 0;    
+                unconstrained = (uacFlags & UacFlags.TrustedForDelegation) != 0;
             }
 
             wrapper.Properties.Add("enabled", enabled);
@@ -142,7 +147,7 @@ namespace SharpHound3.Tasks
                     }
                     else
                     {
-                        type = await ResolutionHelpers.LookupSidType(sid,wrapper.Domain);
+                        type = await ResolutionHelpers.LookupSidType(sid, wrapper.Domain);
                     }
 
                     allowedToActPrincipals.Add(new GenericMember
@@ -154,12 +159,12 @@ namespace SharpHound3.Tasks
             }
 
             wrapper.AllowedToAct = allowedToActPrincipals.Distinct().ToArray();
-            
+
             wrapper.Properties.Add("serviceprincipalnames", result.GetPropertyAsArray("serviceprincipalname"));
 
             wrapper.Properties.Add("lastlogontimestamp", ConvertToUnixEpoch(result.GetProperty("lastlogontimestamp")));
             wrapper.Properties.Add("pwdlastset", ConvertToUnixEpoch(result.GetProperty("pwdlastset")));
-            
+
 
             var os = result.GetProperty("operatingsystem");
             var sp = result.GetProperty("operatingsystemservicepack");
@@ -234,7 +239,7 @@ namespace SharpHound3.Tasks
             var unconstrained = false;
             if (int.TryParse(userAccountControl, out var baseFlags))
             {
-                var uacFlags = (UacFlags) baseFlags;
+                var uacFlags = (UacFlags)baseFlags;
                 enabled = (uacFlags & UacFlags.AccountDisable) == 0;
                 trustedToAuth = (uacFlags & UacFlags.TrustedToAuthForDelegation) != 0;
                 sensitive = (uacFlags & UacFlags.NotDelegated) != 0;

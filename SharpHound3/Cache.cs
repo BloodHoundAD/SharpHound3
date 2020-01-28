@@ -25,7 +25,7 @@ namespace SharpHound3
         [JsonProperty]
         private ConcurrentDictionary<string, LdapTypeEnum> _sidTypeDictionary;
 
-        [JsonProperty][JsonConverter(typeof(AccountCacheConverter))] private ConcurrentDictionary<UserDomainKey, ResolvedPrincipal> _resolvedAccountNameDictionary;
+        [JsonProperty] [JsonConverter(typeof(AccountCacheConverter))] private ConcurrentDictionary<UserDomainKey, ResolvedPrincipal> _resolvedAccountNameDictionary;
 
         [JsonIgnore]
         private readonly Mutex _bhMutex;
@@ -77,7 +77,7 @@ namespace SharpHound3
         {
             _resolvedAccountNameDictionary.TryAdd(key, value);
         }
-        
+
         internal void Add(string key, ResolvedPrincipal value)
         {
             _resolvedPrincipalDictionary.TryAdd(key.ToUpper(), value);

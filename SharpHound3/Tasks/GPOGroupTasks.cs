@@ -58,7 +58,8 @@ namespace SharpHound3.Tasks
             if (target is Domain testDomain && testDomain.Computers.Length > 0)
             {
                 affectedComputers = new List<string>(testDomain.Computers);
-            }else if (target is OU testOu && testOu.Computers.Length > 0)
+            }
+            else if (target is OU testOu && testOu.Computers.Length > 0)
             {
                 affectedComputers = new List<string>(testOu.Computers);
             }
@@ -128,7 +129,7 @@ namespace SharpHound3.Tasks
                     var gpoDomain = Helpers.DistinguishedNameToDomain(gpoDistinguishedName);
 
                     //Get the gpcfilesyspath for the GPO
-                    var gpoResult = await searcher.GetOne("(objectclass=*)", new[] {"gpcfilesyspath"}, SearchScope.Base,
+                    var gpoResult = await searcher.GetOne("(objectclass=*)", new[] { "gpcfilesyspath" }, SearchScope.Base,
                         gpoDistinguishedName);
 
                     var baseFilePath = gpoResult?.GetProperty("gpcfilesyspath");
@@ -392,7 +393,7 @@ namespace SharpHound3.Tasks
                                         });
                                     }
                                 }
-                                
+
                             }
 
                             //Scenario 2: A group has been set as memberOf to one of our local groups
@@ -400,7 +401,7 @@ namespace SharpHound3.Tasks
                             if (rightMatches.Count > 0 && index > 0)
                             {
                                 var sid = key.Trim('*').Substring(0, index - 3).ToUpper();
-                                var type= LdapTypeEnum.Unknown;
+                                var type = LdapTypeEnum.Unknown;
                                 //If the member starts with s-1-5, try to resolve the SID, else treat it as an account name
                                 if (!sid.StartsWith("S-1-5", StringComparison.OrdinalIgnoreCase))
                                 {
@@ -424,8 +425,8 @@ namespace SharpHound3.Tasks
                                 {
                                     var rid = int.Parse(ExtractRid.Match(match.ToString()).Groups[1].Value);
                                     if (!Enum.IsDefined(typeof(LocalGroupRids), rid)) continue;
-                                    
-                                    var targetGroup = (LocalGroupRids) rid;
+
+                                    var targetGroup = (LocalGroupRids)rid;
                                     actions.Add(new GroupAction
                                     {
                                         Target = GroupActionTarget.RestrictedMemberOf,
@@ -530,7 +531,7 @@ namespace SharpHound3.Tasks
                                 {
                                     Action = GroupActionOperation.DeleteUsers,
                                     Target = GroupActionTarget.LocalGroup,
-                                    TargetRid = (LocalGroupRids) targetGroup
+                                    TargetRid = (LocalGroupRids)targetGroup
                                 });
                             }
 
@@ -601,7 +602,7 @@ namespace SharpHound3.Tasks
 
             return actions;
         }
-        
+
         /// <summary>
         /// Resolves a SID to its type
         /// </summary>
@@ -632,7 +633,7 @@ namespace SharpHound3.Tasks
 
                 //Try to resolve as a user object first
                 var (success, sid, type) = await ResolutionHelpers.ResolveAccountNameToSidAndType(user, domain);
-                
+
                 if (!success)
                 {
                     //Resolution failed, so try as a computer objectnow
@@ -645,7 +646,7 @@ namespace SharpHound3.Tasks
 
                 return (true, sid, type);
             }
-            
+
             //The element is just a sid, so return it straight
             var lType = await ResolutionHelpers.LookupSidType(element, domainName);
             return (true, element, lType);

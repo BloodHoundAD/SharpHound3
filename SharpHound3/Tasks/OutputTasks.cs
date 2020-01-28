@@ -58,7 +58,7 @@ namespace SharpHound3.Tasks
         {
             Console.WriteLine(
                 _runTimer != null
-                    ? $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount} {(float) _currentCount / (_runTimer.ElapsedMilliseconds / 1000)})/s -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM"
+                    ? $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount} {(float)_currentCount / (_runTimer.ElapsedMilliseconds / 1000)})/s -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM"
                     : $"Status: {_currentCount} objects finished (+{_currentCount - _lastCount}) -- Using {Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024} MB RAM");
         }
 
@@ -110,7 +110,8 @@ namespace SharpHound3.Tasks
                 Domain = forestName,
                 Members = BaseProducer.GetDomainControllers().Keys.Select(sid => new GenericMember
                 {
-                    MemberId = sid, MemberType = LdapTypeEnum.Computer
+                    MemberId = sid,
+                    MemberType = LdapTypeEnum.Computer
                 }).ToArray()
             };
 
@@ -219,7 +220,7 @@ namespace SharpHound3.Tasks
             _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
             _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
             _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
-            
+
             string finalName;
             var options = Options.Instance;
 
@@ -266,7 +267,7 @@ namespace SharpHound3.Tasks
 
                 foreach (var file in UsedFileNames)
                 {
-                    var entry = new ZipEntry(Path.GetFileName(file)) {DateTime = DateTime.Now};
+                    var entry = new ZipEntry(Path.GetFileName(file)) { DateTime = DateTime.Now };
                     zipStream.PutNextEntry(entry);
 
                     using (var fileStream = File.OpenRead(file))

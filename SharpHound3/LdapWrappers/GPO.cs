@@ -6,7 +6,7 @@ namespace SharpHound3.LdapWrappers
     {
         internal GPO(SearchResultEntry entry) : base(entry)
         {
-            
+
         }
     }
 }

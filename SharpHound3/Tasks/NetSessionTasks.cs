@@ -76,7 +76,7 @@ namespace SharpHound3.Tasks
                         OutputTasks.AddComputerStatus(new ComputerStatus
                         {
                             ComputerName = computer.DisplayName,
-                            Status = ((NetApiStatus) taskResult).ToString(),
+                            Status = ((NetApiStatus)taskResult).ToString(),
                             Task = "NetSessionEnum"
                         });
                     return sessionList;
@@ -87,8 +87,8 @@ namespace SharpHound3.Tasks
 
                 for (var i = 0; i < entriesRead; i++)
                 {
-                    sessions[i] = (SESSION_INFO_10) Marshal.PtrToStructure(iterator, sessionInfoType);
-                    iterator = (IntPtr) (iterator.ToInt64() + Marshal.SizeOf(sessionInfoType));
+                    sessions[i] = (SESSION_INFO_10)Marshal.PtrToStructure(iterator, sessionInfoType);
+                    iterator = (IntPtr)(iterator.ToInt64() + Marshal.SizeOf(sessionInfoType));
                 }
 
                 if (Options.Instance.DumpComputerStatus)

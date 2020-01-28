@@ -52,7 +52,7 @@ namespace SharpHound3
                     PartialResultProcessing.NoPartialResultSupport, null, null);
 
                 var task = Task<SearchResponse>.Factory.FromAsync(iAsyncResult,
-                    x => (SearchResponse) connection.EndSendRequest(x));
+                    x => (SearchResponse)connection.EndSendRequest(x));
 
                 try
                 {
@@ -103,9 +103,9 @@ namespace SharpHound3
                     PartialResultProcessing.NoPartialResultSupport, null, null);
 
                 var task = Task<SearchResponse>.Factory.FromAsync(iAsyncResult,
-                    x => (SearchResponse) connection.EndSendRequest(x));
+                    x => (SearchResponse)connection.EndSendRequest(x));
 
-                
+
                 //Wait for the search request to finish
                 var response = await task;
 
@@ -141,7 +141,7 @@ namespace SharpHound3
         /// <returns>An IEnumerable with search results</returns>
         internal IEnumerable<SearchResultEntry> QueryLdap(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false)
         {
-            var connection = globalCatalog ? GetGlobalCatalogConnection() :  GetLdapConnection();
+            var connection = globalCatalog ? GetGlobalCatalogConnection() : GetLdapConnection();
             try
             {
                 var searchRequest = CreateSearchRequest(ldapFilter, scope, props, adsPath);
@@ -162,7 +162,7 @@ namespace SharpHound3
                     SearchResponse searchResponse;
                     try
                     {
-                        searchResponse = (SearchResponse) connection.SendRequest(searchRequest);
+                        searchResponse = (SearchResponse)connection.SendRequest(searchRequest);
                     }
                     catch (Exception e)
                     {
@@ -179,7 +179,7 @@ namespace SharpHound3
                         yield break;
                     }
 
-                    var pageResponse = (PageResultResponseControl) searchResponse.Controls[0];
+                    var pageResponse = (PageResultResponseControl)searchResponse.Controls[0];
 
                     foreach (SearchResultEntry entry in searchResponse.Entries)
                     {
@@ -230,7 +230,7 @@ namespace SharpHound3
                 {
                     //Asynchronously send our search request
                     var iASyncResult = connection.BeginSendRequest(searchRequest,
-                        PartialResultProcessing.NoPartialResultSupport, null,null);
+                        PartialResultProcessing.NoPartialResultSupport, null, null);
                     var task = Task<SearchResponse>.Factory.FromAsync(iASyncResult, x => (SearchResponse)connection.EndSendRequest(x));
 
                     //Wait for the request to finish
@@ -353,22 +353,22 @@ namespace SharpHound3
             var identifier = new LdapDirectoryIdentifier(domainController, port, false, false);
 
             connection = Options.Instance.LdapUsername != null ? new LdapConnection(identifier, new NetworkCredential(Options.Instance.LdapUsername, Options.Instance.LdapPassword)) : new LdapConnection(identifier);
-            
+
             var ldapSessionOptions = connection.SessionOptions;
             if (!Options.Instance.DisableKerberosSigning)
             {
                 ldapSessionOptions.Signing = true;
                 ldapSessionOptions.Sealing = true;
             }
-            
+
             ldapSessionOptions.ProtocolVersion = 3;
             ldapSessionOptions.ReferralChasing = ReferralChasingOptions.None;
-            
-            connection.Timeout = new TimeSpan(0,5,0);
+
+            connection.Timeout = new TimeSpan(0, 5, 0);
             return connection;
         }
 
-        private SearchRequest CreateSearchRequest(string ldapFilter, SearchScope scope, string[] props, string adsPath=null)
+        private SearchRequest CreateSearchRequest(string ldapFilter, SearchScope scope, string[] props, string adsPath = null)
         {
             var activeDirectorySearchPath = adsPath ?? $"DC={_domainName.Replace(".", ",DC=")}";
             var request = new SearchRequest(activeDirectorySearchPath, ldapFilter, scope, props);
@@ -385,7 +385,7 @@ namespace SharpHound3
 
             var path = _domain.Forest.Schema.Name;
 
-            foreach (var result in QueryLdap("(schemaIDGUID=*)", new[] {"schemaidguid", "name"}, SearchScope.Subtree,
+            foreach (var result in QueryLdap("(schemaIDGUID=*)", new[] { "schemaidguid", "name" }, SearchScope.Subtree,
                 path))
             {
                 var name = result.GetProperty("name");

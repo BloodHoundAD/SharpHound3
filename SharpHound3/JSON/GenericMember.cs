@@ -9,7 +9,7 @@ namespace SharpHound3.JSON
     internal class GenericMember : IEquatable<GenericMember>
     {
         public string MemberId { get; set; }
-        public LdapTypeEnum MemberType { get;set; }
+        public LdapTypeEnum MemberType { get; set; }
 
         public override string ToString()
         {
@@ -28,14 +28,14 @@ namespace SharpHound3.JSON
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != this.GetType()) return false;
-            return Equals((GenericMember) obj);
+            return Equals((GenericMember)obj);
         }
 
         public override int GetHashCode()
         {
             unchecked
             {
-                return ((MemberId != null ? MemberId.GetHashCode() : 0) * 397) ^ (int) MemberType;
+                return ((MemberId != null ? MemberId.GetHashCode() : 0) * 397) ^ (int)MemberType;
             }
         }
     }
