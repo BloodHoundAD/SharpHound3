@@ -66,7 +66,7 @@ namespace SharpHound3
                 ldapFilterParts.Add("(|(samaccounttype=268435456)(samaccounttype=268435457)(samaccounttype=536870912)(samaccounttype=536870913)(samaccounttype=805306368)(samaccounttype=805306369)(objectclass=domain)(objectclass=organizationalUnit)(&(objectcategory=groupPolicyContainer)(flags=*)))");
                 ldapProperties.AddRange(new[]
                 {
-                    "pwdlastset", "lastlogon", "lastlogontimestamp", "objectsid",
+                    "pwdlastset", "lastlogontimestamp",
                     "sidhistory", "useraccountcontrol", "operatingsystem",
                     "operatingsystemservicepack", "serviceprincipalname", "displayname", "mail", "title",
                     "homedirectory","description","admincount","userpassword","gpcfilesyspath","objectclass",
@@ -111,6 +111,12 @@ namespace SharpHound3
             if (userFilter != null)
             {
                 finalFilter = $"(&({finalFilter})({userFilter}))";
+            }
+
+            if (Options.Instance.CollectAllProperties)
+            {
+                ldapProperties = new List<string>();
+                ldapProperties.Add("*");
             }
 
             //Distinct the attributes
