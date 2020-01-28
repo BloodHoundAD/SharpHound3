@@ -13,7 +13,7 @@ namespace SharpHound3
         internal TimeSpan defaultTimeSpan = TimeSpan.FromHours(8);
 
         //Collection Options
-        [Option('c', "CollectionMethod", Default = new[] { "Default" }, HelpText = "Collection Methods: Group, LocalGroup, GPOLocalGroup, Session, LoggedOn, ComputerOnly, Trusts, Default, RDP, DCOM")]
+        [Option('c', "CollectionMethod", Default = new[] { "Default" }, HelpText = "Collection Methods: Group, LocalGroup, GPOLocalGroup, Session, LoggedOn, ObjectProps, ACL, ComputerOnly, Trusts, Default, RDP, DCOM, DCOnly")]
         public IEnumerable<string> CollectionMethods { get; set; }
 
         [Option(HelpText = "Use Stealth Targetting/Enumeration Options", Default = false)]

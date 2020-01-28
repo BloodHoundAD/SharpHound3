@@ -216,8 +216,9 @@ namespace SharpHound3
             Cache.Instance.SaveCache();
 
             //And we're done!
+            var currTime = DateTime.Now;
             Console.WriteLine();
-            Console.WriteLine("SharpHound Enumeration Completed! Happy Graphing!");
+            Console.WriteLine($"SharpHound Enumeration Completed at {currTime.ToShortTimeString()} on {currTime.ToShortDateString()}! Happy Graphing!");
             Console.WriteLine();
         }
 
