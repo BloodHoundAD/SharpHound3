@@ -180,6 +180,11 @@ namespace SharpHound3
             return tempName;
         }
 
+        /// <summary>
+        /// Turns a domain Netbios name into its FQDN using the DsGetDcName function (TESTLAB -> TESTLAB.LOCAL)
+        /// </summary>
+        /// <param name="domainName"></param>
+        /// <returns></returns>
         internal static string ResolveDomainNetbiosToDns(string domainName)
         {
             var key = domainName.ToUpper();
@@ -210,7 +215,11 @@ namespace SharpHound3
             return flatName;
         }
 
-
+        /// <summary>
+        /// Finds a domain controller for the specified domain using DsGetDcName
+        /// </summary>
+        /// <param name="domainName"></param>
+        /// <returns></returns>
         private static string GetDomainControllerForDomain(string domainName)
         {
             var key = domainName.ToUpper();
@@ -239,6 +248,12 @@ namespace SharpHound3
             return domainController;
         }
 
+        /// <summary>
+        /// Attempts to turn an account name into its corresponding SID as well as determine the type of the object
+        /// </summary>
+        /// <param name="accountName"></param>
+        /// <param name="accountDomain"></param>
+        /// <returns></returns>
         internal static async Task<(bool success, string sid, LdapTypeEnum type)> ResolveAccountNameToSidAndType(string accountName,
             string accountDomain)
         {
@@ -277,6 +292,11 @@ namespace SharpHound3
             return (sid != null, sid, type);
         }
 
+        /// <summary>
+        /// Attempts to turn an OU's distinguished name into its corresponding objectguid
+        /// </summary>
+        /// <param name="distinguishedName"></param>
+        /// <returns></returns>
         internal static async Task<(bool success, string guid)> OUDistinguishedNameToGuid(string distinguishedName)
         {
             if (AppCache.GetResolvedDistinguishedName(distinguishedName, out var resolved))
@@ -303,6 +323,11 @@ namespace SharpHound3
             return (true, guid);
         }
 
+        /// <summary>
+        /// Attempts to resolve a distinguishedname to its corresponding sid. Checks for ForeignSecurityPrincipals
+        /// </summary>
+        /// <param name="distinguishedName"></param>
+        /// <returns></returns>
         internal static async Task<(string sid, LdapTypeEnum type)> ResolveDistinguishedName(string distinguishedName)
         {
             //Check cache to see if we have the item in there first.
@@ -311,10 +336,12 @@ namespace SharpHound3
                 return (resolved.ObjectIdentifier, resolved.ObjectType);
             }
 
+            //Get the domain name from the DN
             var domain = Helpers.DistinguishedNameToDomain(distinguishedName);
 
             if (distinguishedName.Contains("ForeignSecurityPrincipals"))
             {
+                //ForeignSecurityPrincipals generally contain the SID of the object, so we'll extract it and try resolving the SID type
                 var sid = distinguishedName.Split(',')[0].Substring(3);
                 
                 if (!sid.Contains("S-1-5")) 
@@ -340,6 +367,11 @@ namespace SharpHound3
             return (resolvedSid, resolvedType);
         }
 
+        /// <summary>
+        /// Uses LDAP to find the SID associated with the distinguishedname
+        /// </summary>
+        /// <param name="distinguishedName"></param>
+        /// <returns></returns>
         private static async Task<(string sid, LdapTypeEnum type)> ResolveDistinguishedNameLdap(
             string distinguishedName)
         {
@@ -358,6 +390,12 @@ namespace SharpHound3
             return (sid, type);
         }
 
+        /// <summary>
+        /// Does some common checks on a SID, and attempts to find the type of the object
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <param name="domain"></param>
+        /// <returns></returns>
         internal static async Task<(string finalSid, LdapTypeEnum type)> ResolveSidAndGetType(string sid, string domain)
         {
             if (sid.Contains("0ACNF"))
@@ -378,6 +416,12 @@ namespace SharpHound3
             return (sid, type);
         }
 
+        /// <summary>
+        /// Looks up the object type of a specified SID
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <param name="domain"></param>
+        /// <returns></returns>
         internal static async Task<LdapTypeEnum> LookupSidType(string sid, string domain)
         {
             var hexSid = ConvertSidToHexSid(sid);
@@ -392,6 +436,11 @@ namespace SharpHound3
             return result?.GetLdapType() ?? LdapTypeEnum.Unknown;
         }
 
+        /// <summary>
+        /// Converts a string sid to its hex representation for LDAP searches
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <returns></returns>
         private static string ConvertSidToHexSid(string sid)
         {
             try
@@ -408,6 +457,11 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Attempts to find the corresponding domain for a security identifier
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <returns></returns>
         private static async Task<string> GetDomainNameFromSid(string sid)
         {
             try
@@ -433,6 +487,11 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Uses LDAP to find the domain name associated with a SID
+        /// </summary>
+        /// <param name="sid"></param>
+        /// <returns></returns>
         private static async Task<string> GetDomainNameFromSidLdap(string sid)
         {
             var searcher = Helpers.GetDirectorySearcher(Options.Instance.Domain);
@@ -464,6 +523,11 @@ namespace SharpHound3
             return null;
         }
 
+        /// <summary>
+        /// Calls the NetWkstaGetInfo API on a hostname
+        /// </summary>
+        /// <param name="hostname"></param>
+        /// <returns></returns>
         private static async Task<(bool success, WorkstationInfo100 info)> CallNetWkstaGetInfo(string hostname)
         {
             if (!Helpers.CheckPort(hostname, 445))
@@ -489,6 +553,13 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Uses a socket and a set of bytes to request the NETBIOS name from a remote computer
+        /// </summary>
+        /// <param name="server"></param>
+        /// <param name="domain"></param>
+        /// <param name="netbios"></param>
+        /// <returns></returns>
         private static bool RequestNetbiosNameFromComputer(string server, string domain, out string netbios)
         {
             var receiveBuffer = new byte[1024];

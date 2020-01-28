@@ -157,6 +157,11 @@ namespace SharpHound3
             return searcher;
         }
 
+        /// <summary>
+        /// Strips a serviceprincipalname entry down to just its hostname
+        /// </summary>
+        /// <param name="target"></param>
+        /// <returns></returns>
         internal static string StripSPN(string target)
         {
             return SPNRegex.IsMatch(target) ? target.Split('/')[1].Split(':')[0] : target;
@@ -223,6 +228,12 @@ namespace SharpHound3
             DNSResolverCache.TryAdd(key, resolver);
             return resolver;
         }
+
+        /// <summary>
+        /// Finds a domain controller serving DNS in the target domain
+        /// </summary>
+        /// <param name="domain"></param>
+        /// <returns></returns>
         private static string FindDomainDNSServer(string domain)
         {
             var searcher = GetDirectorySearcher(domain);
@@ -248,6 +259,10 @@ namespace SharpHound3
             return target;
         }
 
+        /// <summary>
+        /// Does throttle and jitter for computer requests
+        /// </summary>
+        /// <returns></returns>
         internal static async Task DoDelay()
         {
             var opts = Options.Instance;
@@ -265,6 +280,12 @@ namespace SharpHound3
             await Task.Delay(delay);
         }
 
+        /// <summary>
+        /// Wrapper for the port scan function that checks caching and other options
+        /// </summary>
+        /// <param name="hostname"></param>
+        /// <param name="port"></param>
+        /// <returns></returns>
         internal static bool CheckPort(string hostname, int port)
         {
             if (Options.Instance.SkipPortScan)
@@ -278,6 +299,12 @@ namespace SharpHound3
             return portOpen;
         }
 
+        /// <summary>
+        /// Checks if a specified port is available on the hostname
+        /// </summary>
+        /// <param name="hostname"></param>
+        /// <param name="port"></param>
+        /// <returns></returns>
         private static bool CheckHostPort(string hostname, int port)
         {
             using (var client = new TcpClient())
@@ -299,6 +326,11 @@ namespace SharpHound3
             }
         }
 
+        /// <summary>
+        /// Normalizes a domain name to its full DNS name
+        /// </summary>
+        /// <param name="domain"></param>
+        /// <returns></returns>
         internal static string NormalizeDomainName(string domain)
         {
             var resolved = domain;
@@ -311,6 +343,10 @@ namespace SharpHound3
             return resolved.ToUpper();
         }
         
+        /// <summary>
+        /// Creates a filename for the looped results which will contain the results of all loops
+        /// </summary>
+        /// <returns></returns>
         internal static string GetLoopFileName()
         {
             var options = Options.Instance;
@@ -333,6 +369,13 @@ namespace SharpHound3
             return finalPath;
         }
 
+        /// <summary>
+        /// Uses specified options to determine the final filename of the given file
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <param name="extension"></param>
+        /// <param name="addTime"></param>
+        /// <returns></returns>
         internal static string ResolveFileName(string filename, string extension, bool addTime)
         {
             var finalFilename = filename;
@@ -359,9 +402,14 @@ namespace SharpHound3
             return finalPath;
         }
 
+        /// <summary>
+        /// Converts a string to its base64 representation
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
         internal static string Base64(string input)
         {
-            var plainBytes = System.Text.Encoding.UTF8.GetBytes(input);
+            var plainBytes = Encoding.UTF8.GetBytes(input);
             return Convert.ToBase64String(plainBytes);
         }
 

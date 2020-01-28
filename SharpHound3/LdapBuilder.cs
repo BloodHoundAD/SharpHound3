@@ -6,6 +6,11 @@ namespace SharpHound3
 {
     internal class LdapBuilder
     {
+        /// <summary>
+        /// Builds the necessary attributes and ldap query for the specified set of options
+        /// </summary>
+        /// <param name="methods"></param>
+        /// <returns></returns>
         internal static LdapQueryData BuildLdapQuery(CollectionMethodResolved methods)
         {
             var ldapFilterParts = new List<string>();
@@ -39,6 +44,7 @@ namespace SharpHound3
                 ldapFilterParts.Add("(&(sAMAccountType=805306369)(!(UserAccountControl:1.2.840.113556.1.4.803:=2)))");
             }
 
+            //ACL Collection
             if (methods.HasFlag(CollectionMethodResolved.ACL))
             {
                 ldapFilterParts.Add("(|(samAccountType=805306368)(samAccountType=805306369)(samAccountType=268435456)(samAccountType=268435457)(samAccountType=536870912)(samAccountType=536870913)(objectClass=domain)(&(objectcategory=groupPolicyContainer)(flags=*))(objectcategory=organizationalUnit))");
@@ -48,11 +54,13 @@ namespace SharpHound3
                 });
             }
 
+            //Trust enumeration
             if (methods.HasFlag(CollectionMethodResolved.Trusts))
             {
                 ldapFilterParts.Add("(objectclass=domain)");
             }
 
+            //Object Properties
             if (methods.HasFlag(CollectionMethodResolved.ObjectProps))
             {
                 ldapFilterParts.Add("(|(samaccounttype=268435456)(samaccounttype=268435457)(samaccounttype=536870912)(samaccounttype=536870913)(samaccounttype=805306368)(samaccounttype=805306369)(objectclass=domain)(objectclass=organizationalUnit)(&(objectcategory=groupPolicyContainer)(flags=*)))");
@@ -67,20 +75,23 @@ namespace SharpHound3
                 });
             }
 
+            //Container enumeration
             if (methods.HasFlag(CollectionMethodResolved.Container))
             {
                 ldapFilterParts.Add("(|(&(&(objectcategory=groupPolicyContainer)(flags=*))(name=*)(gpcfilesyspath=*))(objectcategory=organizationalUnit)(objectClass=domain))");
                 ldapProperties.AddRange(new[] { "gplink", "gpoptions", "name", "displayname" });
             }
 
+            //GPO Local group enumeration
             if (methods.HasFlag(CollectionMethodResolved.GPOLocalGroup))
             {
                 //ldapFilterParts.Add("(&(&(objectcategory=groupPolicyContainer)(flags=*))(name=*)(gpcfilesyspath=*))");
                 //ldapProperties.AddRange(new[] {"gpcfilesyspath", "displayname"});
-                ldapFilterParts.Add("(&(|(objectcategory=organizationalUnit)(objectclass=domain))(gplink=*))");
+                ldapFilterParts.Add("(&(|(objectcategory=organizationalUnit)(objectclass=domain))(gplink=*)(flags=*))");
                 ldapProperties.AddRange(new[] { "gplink", "name" });
             }
 
+            //SPN Target Enumeration
             if (methods.HasFlag(CollectionMethodResolved.SPNTargets))
             {
                 ldapFilterParts.Add("(&(samaccounttype=805306368)(serviceprincipalname=*))");
@@ -90,15 +101,19 @@ namespace SharpHound3
                 });
             }
 
+            //Take our query parts, and join them together
             var finalFilter = string.Join("", ldapFilterParts.ToArray());
+            //Surround the filters with (|), which will OR them together
             finalFilter = ldapFilterParts.Count == 1 ? ldapFilterParts[0] : $"(|{finalFilter})";
 
+            //Add the user specified filter if it exists
             var userFilter = Options.Instance.LdapFilter;
             if (userFilter != null)
             {
                 finalFilter = $"(&({finalFilter})({userFilter}))";
             }
 
+            //Distinct the attributes
             return new LdapQueryData
             {
                 LdapFilter = finalFilter,
