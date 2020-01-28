@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.DirectoryServices;
+using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using SharpHound3.Enums;
@@ -13,6 +15,18 @@ namespace SharpHound3.Tasks
     internal class ObjectPropertyTasks
     {
         private static readonly DateTime WindowsEpoch = new DateTime(1970, 1, 1);
+
+        private static readonly string[] ReservedAttributes =
+        {
+            "pwdlastset", "lastlogon", "lastlogontimestamp", "objectsid",
+            "sidhistory", "useraccountcontrol", "operatingsystem",
+            "operatingsystemservicepack", "serviceprincipalname", "displayname", "mail", "title",
+            "homedirectory", "description", "admincount", "userpassword", "gpcfilesyspath", "objectclass",
+            "msds-behavior-version", "objectguid", "name", "gpoptions", "msds-allowedtodelegateto",
+            "msDS-allowedtoactonbehalfofotheridentity", "displayname",
+            "sidhistory", "samaccountname","samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname", "msds-groupmsamembership",
+            "distinguishedname", "memberof"
+        };
 
         /// <summary>
         /// Entrypoint for the pipeline
@@ -49,7 +63,63 @@ namespace SharpHound3.Tasks
                 ParseGroupProperties(group);
             }
 
+            if (Options.Instance.CollectAllProperties)
+            {
+                ParseAllProperties(wrapper);
+            }
+
             return wrapper;
+        }
+
+        private static void ParseAllProperties(LdapWrapper wrapper)
+        {
+            var result = wrapper.SearchResult;
+
+            foreach (var property in result.Attributes.AttributeNames)
+            {
+                var propName = property.ToString().ToLower();
+                if (ReservedAttributes.Contains(propName))
+                    continue;
+
+                var collection = result.Attributes[propName];
+                if (collection.Count == 0)
+                    continue;
+                if (collection.Count == 1)
+                {
+                    var testString = result.GetProperty(propName);
+                    if (!string.IsNullOrEmpty(testString))
+                        wrapper.Properties.Add(propName, BestGuessConvert(testString));
+                }else
+                {
+                    var arr = result.GetPropertyAsArray(propName);
+                    if (arr.Length > 0)
+                        wrapper.Properties.Add(propName, arr.Select(BestGuessConvert).ToArray());
+                }
+            }
+        }
+
+        private static object BestGuessConvert(string property)
+        {
+            //Parse boolean values
+            if (bool.TryParse(property, out var boolResult))
+            {
+                return boolResult;
+            }
+
+            //A string ending with 0Z is likely a timestamp
+            if (property.EndsWith("0Z"))
+            {
+                var dt = DateTime.ParseExact(property, "yyyyMMddHHmmss.0K", CultureInfo.CurrentCulture);
+                return (long)(dt.Subtract(WindowsEpoch).TotalSeconds);
+            }
+
+            //This string corresponds to the max int, and is usually set in accountexpires
+            if (property == "9223372036854775807")
+            {
+                return "Never";
+            }
+
+            return property;
         }
 
         /// <summary>
