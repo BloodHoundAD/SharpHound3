@@ -19,7 +19,6 @@ namespace SharpHound3
         private static readonly ConcurrentDictionary<string, string> NetbiosDomainNameCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, string> DomainControllerCache = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, string> HostResolutionMap = new ConcurrentDictionary<string, string>();
-        private static readonly Cache AppCache = Cache.Instance;
         private static readonly string[] GroupMembershipLookupProps = { "samaccounttype", "objectsid", "objectclass" };
         private static readonly string[] OUGuidLookupProps = { "objectguid" };
         private static readonly string[] ResolutionProps = { "samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname" };
@@ -264,7 +263,7 @@ namespace SharpHound3
                 AccountName = accountName
             };
 
-            if (AppCache.GetResolvedAccount(key, out var principal))
+            if (Cache.Instance.GetResolvedAccount(key, out var principal))
                 return (principal.ObjectIdentifier != null, principal.ObjectIdentifier, principal.ObjectType);
 
             var searcher = Helpers.GetDirectorySearcher(domain);
@@ -272,7 +271,7 @@ namespace SharpHound3
 
             if (result == null)
             {
-                AppCache.Add(key, new ResolvedPrincipal
+                Cache.Instance.Add(key, new ResolvedPrincipal
                 {
                     ObjectIdentifier = null,
                     ObjectType = LdapTypeEnum.Unknown
@@ -283,7 +282,7 @@ namespace SharpHound3
             var sid = result.GetSid();
             var type = result.GetLdapType();
 
-            AppCache.Add(key, new ResolvedPrincipal
+            Cache.Instance.Add(key, new ResolvedPrincipal
             {
                 ObjectIdentifier = sid,
                 ObjectType = type
@@ -299,7 +298,7 @@ namespace SharpHound3
         /// <returns></returns>
         internal static async Task<(bool success, string guid)> OUDistinguishedNameToGuid(string distinguishedName)
         {
-            if (AppCache.GetResolvedDistinguishedName(distinguishedName, out var resolved))
+            if (Cache.Instance.GetResolvedDistinguishedName(distinguishedName, out var resolved))
                 return (resolved.ObjectIdentifier != null, resolved.ObjectIdentifier);
 
             var domain = Helpers.DistinguishedNameToDomain(distinguishedName);
@@ -311,7 +310,7 @@ namespace SharpHound3
             var guidBytes = result?.GetPropertyAsBytes("objectguid");
             if (guidBytes == null)
             {
-                AppCache.Add(distinguishedName, new ResolvedPrincipal
+                Cache.Instance.Add(distinguishedName, new ResolvedPrincipal
                 {
                     ObjectIdentifier = null,
                     ObjectType = LdapTypeEnum.OU
@@ -331,7 +330,7 @@ namespace SharpHound3
         internal static async Task<(string sid, LdapTypeEnum type)> ResolveDistinguishedName(string distinguishedName)
         {
             //Check cache to see if we have the item in there first.
-            if (AppCache.GetResolvedDistinguishedName(distinguishedName, out var resolved))
+            if (Cache.Instance.GetResolvedDistinguishedName(distinguishedName, out var resolved))
             {
                 return (resolved.ObjectIdentifier, resolved.ObjectType);
             }
@@ -348,7 +347,7 @@ namespace SharpHound3
                     return (null, LdapTypeEnum.Unknown);
 
                 var (finalSid, type) = await ResolveSidAndGetType(sid, domain);
-                AppCache.Add(distinguishedName, new ResolvedPrincipal
+                Cache.Instance.Add(distinguishedName, new ResolvedPrincipal
                 {
                     ObjectIdentifier = finalSid,
                     ObjectType = type
@@ -358,7 +357,7 @@ namespace SharpHound3
             }
 
             var (resolvedSid, resolvedType) = await ResolveDistinguishedNameLdap(distinguishedName);
-            AppCache.Add(distinguishedName, new ResolvedPrincipal
+            Cache.Instance.Add(distinguishedName, new ResolvedPrincipal
             {
                 ObjectIdentifier = resolvedSid,
                 ObjectType = resolvedType
@@ -412,7 +411,7 @@ namespace SharpHound3
 
             type = await LookupSidType(sid, domain);
 
-            AppCache.Add(sid, type);
+            Cache.Instance.Add(sid, type);
             return (sid, type);
         }
 
