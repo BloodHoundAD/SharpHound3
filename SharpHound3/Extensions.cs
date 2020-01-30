@@ -193,6 +193,11 @@ namespace SharpHound3
             if (objectId == null)
                 return LdapTypeEnum.Unknown;
 
+            if (searchResultEntry.GetPropertyAsBytes("msds-groupmsamembership") != null)
+            {
+                return LdapTypeEnum.User;
+            }
+
             if (CommonPrincipal.GetCommonSid(objectId, out var commonPrincipal))
                 return commonPrincipal.Type;
 

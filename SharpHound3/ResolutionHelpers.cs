@@ -21,7 +21,7 @@ namespace SharpHound3
         private static readonly ConcurrentDictionary<string, string> HostResolutionMap = new ConcurrentDictionary<string, string>();
         private static readonly string[] GroupMembershipLookupProps = { "samaccounttype", "objectsid", "objectclass" };
         private static readonly string[] OUGuidLookupProps = { "objectguid" };
-        private static readonly string[] ResolutionProps = { "samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname" };
+        private static readonly string[] ResolutionProps = { "samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname", "msds-groupmsamembership" };
 
         // The following byte stream contains the necessary message
         // to request a NetBios name from a machine

@@ -33,7 +33,7 @@ namespace SharpHound3
         private static readonly CancellationTokenSource CancellationTokenSource = new CancellationTokenSource();
         private static readonly Regex DCReplaceRegex = new Regex("DC=", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        internal static readonly string[] ResolutionProps = { "samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname" };
+        internal static readonly string[] ResolutionProps = { "samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname", "msds-groupmsamembership" };
 
         private static readonly Regex SPNRegex = new Regex(@".*\/.*", RegexOptions.Compiled);
         private static readonly string ProcStartTime = $"{DateTime.Now:yyyyMMddHHmmss}";
