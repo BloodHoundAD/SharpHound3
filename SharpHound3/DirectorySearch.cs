@@ -18,17 +18,17 @@ namespace SharpHound3
     {
         private readonly string _domainController;
         private readonly string _domainName;
-        private readonly Domain _domain;
         private Dictionary<string, string> _domainGuidMap;
         private bool _isFaulted;
+
+        private readonly string baseLdapPath;
         //Thread-safe storage for our Ldap Connection Pool
         private readonly ConcurrentBag<LdapConnection> _connectionPool = new ConcurrentBag<LdapConnection>();
 
         public DirectorySearch(string domainName = null, string domainController = null)
         {
-            _domainName = domainName;
-            _domain = GetDomain();
             _domainName = Helpers.NormalizeDomainName(domainName);
+            baseLdapPath = $"DC={_domainName.Replace(".", ",DC=")}";
             _domainController = Options.Instance.DomainController ?? domainController;
             _domainGuidMap = new Dictionary<string, string>();
             CreateSchemaMap();
@@ -293,27 +293,6 @@ namespace SharpHound3
         }
 
         /// <summary>
-        /// Gets the domain object associated with the specified domain for this DirectorySearcher
-        /// </summary>
-        /// <returns></returns>
-        private Domain GetDomain()
-        {
-            try
-            {
-                if (_domainName == null)
-                    return Domain.GetCurrentDomain();
-
-                var context = new DirectoryContext(DirectoryContextType.Domain, _domainName);
-                return Domain.GetDomain(context);
-            }
-            catch
-            {
-                _isFaulted = true;
-                return null;
-            }
-        }
-
-        /// <summary>
         /// Gets an LDAPConnection to the Global Catalog
         /// </summary>
         /// <returns></returns>
@@ -363,14 +342,15 @@ namespace SharpHound3
 
             ldapSessionOptions.ProtocolVersion = 3;
             ldapSessionOptions.ReferralChasing = ReferralChasingOptions.None;
+            ldapSessionOptions.SendTimeout = new TimeSpan(0,0,10,0);
 
-            connection.Timeout = new TimeSpan(0, 5, 0);
+            connection.Timeout = new TimeSpan(0,0, 10, 0);
             return connection;
         }
 
         private SearchRequest CreateSearchRequest(string ldapFilter, SearchScope scope, string[] props, string adsPath = null)
         {
-            var activeDirectorySearchPath = adsPath ?? $"DC={_domainName.Replace(".", ",DC=")}";
+            var activeDirectorySearchPath = adsPath ?? baseLdapPath;
             var request = new SearchRequest(activeDirectorySearchPath, ldapFilter, scope, props);
             request.Controls.Add(new SearchOptionsControl(SearchOption.DomainScope));
 
@@ -383,10 +363,7 @@ namespace SharpHound3
             if (_isFaulted)
                 return;
 
-            var path = _domain.Forest.Schema.Name;
-
-            foreach (var result in QueryLdap("(schemaIDGUID=*)", new[] { "schemaidguid", "name" }, SearchScope.Subtree,
-                path))
+            foreach (var result in QueryLdap("(schemaIDGUID=*)", new[] { "schemaidguid", "name" }, SearchScope.Subtree, $"CN=Schema,CN=Configuration,{baseLdapPath}"))
             {
                 var name = result.GetProperty("name");
                 var guid = new Guid(result.GetPropertyAsBytes("schemaidguid")).ToString();
