@@ -25,7 +25,7 @@ namespace SharpHound3.Tasks
             "msds-behavior-version", "objectguid", "name", "gpoptions", "msds-allowedtodelegateto",
             "msDS-allowedtoactonbehalfofotheridentity", "displayname",
             "sidhistory", "samaccountname","samaccounttype", "objectsid", "objectguid", "objectclass", "samaccountname", "msds-groupmsamembership",
-            "distinguishedname", "memberof"
+            "distinguishedname", "memberof", "logonhours", "ntsecuritydescriptor"
         };
 
         /// <summary>
@@ -88,7 +88,15 @@ namespace SharpHound3.Tasks
                 {
                     var testString = result.GetProperty(propName);
                     if (!string.IsNullOrEmpty(testString))
-                        wrapper.Properties.Add(propName, BestGuessConvert(testString));
+                        if (propName == "badpasswordtime")
+                        {
+                            wrapper.Properties.Add(propName, ConvertToUnixEpoch(testString));
+                        }
+                        else
+                        {
+                            wrapper.Properties.Add(propName, BestGuessConvert(testString));
+                        }
+                        
                 }else
                 {
                     var arr = result.GetPropertyAsArray(propName);
@@ -110,7 +118,7 @@ namespace SharpHound3.Tasks
             if (property.EndsWith("0Z"))
             {
                 var dt = DateTime.ParseExact(property, "yyyyMMddHHmmss.0K", CultureInfo.CurrentCulture);
-                return (long)(dt.Subtract(WindowsEpoch).TotalSeconds);
+                return $"TMSTMP-{(long)dt.Subtract(WindowsEpoch).TotalSeconds}";
             }
 
             //This string corresponds to the max int, and is usually set in accountexpires
@@ -392,14 +400,14 @@ namespace SharpHound3.Tasks
         /// </summary>
         /// <param name="ldapTime"></param>
         /// <returns></returns>
-        private static long ConvertToUnixEpoch(string ldapTime)
+        private static string ConvertToUnixEpoch(string ldapTime)
         {
             if (ldapTime == null)
-                return -1;
+                return "Never";
 
             var time = long.Parse(ldapTime);
             if (time == 0)
-                return 0;
+                return "Never";
 
             long toReturn;
 
@@ -412,7 +420,7 @@ namespace SharpHound3.Tasks
                 toReturn = -1;
             }
 
-            return toReturn;
+            return $"TMSTMP-{toReturn}";
         }
     }
 }
