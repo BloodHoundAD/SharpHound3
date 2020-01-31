@@ -71,6 +71,10 @@ namespace SharpHound3.Tasks
             return wrapper;
         }
 
+        /// <summary>
+        /// Parses remaining properties when the --CollectAllProperties flag is specified
+        /// </summary>
+        /// <param name="wrapper"></param>
         private static void ParseAllProperties(LdapWrapper wrapper)
         {
             var result = wrapper.SearchResult;
@@ -106,6 +110,11 @@ namespace SharpHound3.Tasks
             }
         }
 
+        /// <summary>
+        /// Does a best guess conversion of the property to a type useable by the UI
+        /// </summary>
+        /// <param name="property"></param>
+        /// <returns></returns>
         private static object BestGuessConvert(string property)
         {
             //Parse boolean values
