@@ -166,9 +166,9 @@ namespace SharpHound3
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine(ldapFilter);
-                        Console.WriteLine("\nUnexpected exception occured:\n\t{0}: {1}",
-                            e.GetType().Name, e.Message);
+                        //Console.WriteLine(ldapFilter);
+                        //Console.WriteLine("\nUnexpected exception occured:\n\t{0}: {1}",
+                        //    e.GetType().Name, e.Message);
                         yield break;
                     }
 
@@ -362,6 +362,8 @@ namespace SharpHound3
             var map = new Dictionary<string, string>();
             if (_isFaulted)
                 return;
+
+            Console.WriteLine($"[+] Creating Schema map for domain {_domainName} using path CN=Schema,CN=Configuration,{baseLdapPath}");
 
             foreach (var result in QueryLdap("(schemaIDGUID=*)", new[] { "schemaidguid", "name" }, SearchScope.Subtree, $"CN=Schema,CN=Configuration,{baseLdapPath}"))
             {

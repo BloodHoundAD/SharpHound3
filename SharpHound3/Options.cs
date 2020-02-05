@@ -84,6 +84,7 @@ namespace SharpHound3
         [Option(HelpText = "Password to use for LDAP", Default = null)]
         public string LdapPassword { get; set; }
 
+
         //Enumeration Options
         [Option(HelpText = "Skip SMB port checks when connecting to computers", Default = false)]
         public bool SkipPortScan { get; set; }

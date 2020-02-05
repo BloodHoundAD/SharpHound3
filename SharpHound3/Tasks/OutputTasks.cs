@@ -116,6 +116,7 @@ namespace SharpHound3.Tasks
             };
 
             enterpriseDomainControllers.Properties.Add("name", $"ENTERPRISE DOMAIN CONTROLLERS@{forestName}");
+            enterpriseDomainControllers.Properties.Add("domain", forestName);
 
             _groupOutput.Value.WriteObject(enterpriseDomainControllers);
 

@@ -43,6 +43,7 @@ namespace SharpHound3.Tasks
                     var trustAttributes = (TrustAttributes)int.Parse(trustedDomain.GetProperty("trustattributes"));
                     var transitive = (trustAttributes & TrustAttributes.NonTransitive) == 0;
                     var targetName = trustedDomain.GetProperty("cn").ToUpper();
+                    var sidFiltering = (trustAttributes & TrustAttributes.FilterSids) != 0;
 
                     TrustType trustType;
 
@@ -64,13 +65,15 @@ namespace SharpHound3.Tasks
                         trustType = TrustType.Unknown;
                     }
 
+
                     return new Trust
                     {
                         IsTransitive = transitive,
                         TrustDirection = trustDirection,
                         TargetDomainSid = targetSid,
                         TrustType = trustType,
-                        TargetDomainName = targetName
+                        TargetDomainName = targetName,
+                        SidFilteringEnabled = sidFiltering
                     };
                 }).Where(trust => trust != null).ToArray();
             domain.Trusts = trusts;
