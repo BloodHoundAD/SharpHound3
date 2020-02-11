@@ -1,27 +1,4 @@
-﻿function Invoke-SharpHound{
-	<#
-	.SYNOPSIS
-		
-		Runs the SharpHound C# Ingestor using reflection. The assembly is stored in base64 format in this file
-
-	.DESCRIPTION
-		
-		Using reflection and assembly.load, load the compiled SharpHound C# ingestor into memory
-        and run it without touching disk. Parameters are converted to the equivalent CLI arguments
-        for the SharpHound executable and passed in via reflection. The appropriate function
-        calls are made in order to ensure that assembly dependencies are loaded properly.
-
-	.PARAMETER CollectionMethod
-
-		Specifies the CollectionMethods being used, comma seperated
-			
-
-	#>
-}
-
-
-
-function Invoke-BloodHound{
+﻿function Invoke-BloodHound{
     <#
     .SYNOPSIS
 
@@ -269,7 +246,7 @@ function Invoke-BloodHound{
 		[Switch]
         $RandomizeFilenames,
 
-		[Switch]
+		[String]
         $ZipFilename,
 
 		[Switch]
@@ -357,7 +334,7 @@ function Invoke-BloodHound{
     }
     
     if ($Domain){
-        $vars.Add("-d");
+        $vars.Add("--Domain");
         $vars.Add($Domain);
     }
 
@@ -373,7 +350,6 @@ function Invoke-BloodHound{
         $vars.Add("--ComputerFile");
         $vars.Add($ComputerFile);
     }
-
 
 	if ($OutputDirectory){
         $vars.Add("--OutputDirectory");
@@ -517,8 +493,8 @@ function Invoke-BloodHound{
 		$vars.Add($LoopInterval)
 	}
 
-
     $passed = [string[]]$vars.ToArray()
+
 
     #ENCODEDCONTENTHERE
 }
