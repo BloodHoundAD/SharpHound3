@@ -247,7 +247,7 @@ function Invoke-BloodHound{
         $Domain,
 
 		[Switch]
-        WindowsOnly,
+        $WindowsOnly,
 
 		[String]
         $ComputerFile,
@@ -338,14 +338,14 @@ function Invoke-BloodHound{
         [int]
         $StatusInterval,
 
-		[Switch],
+		[Switch]
 		$Loop,
 
 		[String]
 		$LoopDuration,
 
 		[String]
-		$LoopInterval,
+		$LoopInterval
         
     )
 
