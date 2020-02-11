@@ -78,6 +78,7 @@ namespace SharpHound3.Tasks
         private static void ParseAllProperties(LdapWrapper wrapper)
         {
             var result = wrapper.SearchResult;
+            var flag = IsTextUnicodeFlags.IS_TEXT_UNICODE_STATISTICS;
 
             foreach (var property in result.Attributes.AttributeNames)
             {
@@ -90,7 +91,15 @@ namespace SharpHound3.Tasks
                     continue;
                 if (collection.Count == 1)
                 {
+                    var testBytes = result.GetPropertyAsBytes(propName);
+                    
+                    if (testBytes == null || testBytes.Length == 0 || !IsTextUnicode(testBytes, testBytes.Length, ref flag))
+                    {
+                        continue;
+                    }
+
                     var testString = result.GetProperty(propName);
+
                     if (!string.IsNullOrEmpty(testString))
                         if (propName == "badpasswordtime")
                         {
@@ -103,9 +112,16 @@ namespace SharpHound3.Tasks
                         
                 }else
                 {
+                    var arrBytes = result.GetPropertyAsArrayOfBytes(propName);
+                    if (arrBytes.Length == 0 || !IsTextUnicode(arrBytes[0], arrBytes[0].Length, ref flag))
+                        continue;
+
                     var arr = result.GetPropertyAsArray(propName);
                     if (arr.Length > 0)
+                    {
                         wrapper.Properties.Add(propName, arr.Select(BestGuessConvert).ToArray());
+                    }
+                        
                 }
             }
         }
@@ -430,6 +446,35 @@ namespace SharpHound3.Tasks
             }
 
             return $"TMSTMP-{toReturn}";
+        }
+
+        [DllImport("Advapi32", SetLastError = false)]
+        static extern bool IsTextUnicode(byte[] buf, int len, ref IsTextUnicodeFlags opt);
+
+        [Flags]
+        enum IsTextUnicodeFlags : int
+        {
+            IS_TEXT_UNICODE_ASCII16 = 0x0001,
+            IS_TEXT_UNICODE_REVERSE_ASCII16 = 0x0010,
+
+            IS_TEXT_UNICODE_STATISTICS = 0x0002,
+            IS_TEXT_UNICODE_REVERSE_STATISTICS = 0x0020,
+
+            IS_TEXT_UNICODE_CONTROLS = 0x0004,
+            IS_TEXT_UNICODE_REVERSE_CONTROLS = 0x0040,
+
+            IS_TEXT_UNICODE_SIGNATURE = 0x0008,
+            IS_TEXT_UNICODE_REVERSE_SIGNATURE = 0x0080,
+
+            IS_TEXT_UNICODE_ILLEGAL_CHARS = 0x0100,
+            IS_TEXT_UNICODE_ODD_LENGTH = 0x0200,
+            IS_TEXT_UNICODE_DBCS_LEADBYTE = 0x0400,
+            IS_TEXT_UNICODE_NULL_BYTES = 0x1000,
+
+            IS_TEXT_UNICODE_UNICODE_MASK = 0x000F,
+            IS_TEXT_UNICODE_REVERSE_MASK = 0x00F0,
+            IS_TEXT_UNICODE_NOT_UNICODE_MASK = 0x0F00,
+            IS_TEXT_UNICODE_NOT_ASCII_MASK = 0xF000
         }
     }
 }
