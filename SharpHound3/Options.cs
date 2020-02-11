@@ -17,7 +17,7 @@ namespace SharpHound3
         [Option(HelpText = "Use Stealth Targetting/Enumeration Options", Default = false)]
         public bool Stealth { get; set; }
 
-        [Option('d', HelpText = "Specify domain for enumeration", Default = null)]
+        [Option('d', "Domain", HelpText = "Specify domain for enumeration", Default = null)]
         public string Domain { get; set; }
 
         [Option(HelpText = "Limit collection to Windows hosts only", Default = false)]
