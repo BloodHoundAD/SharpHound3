@@ -124,10 +124,10 @@ namespace SharpHound3
         public bool Verbose { get; set; }
 
         //Loop Options
-        [Option(HelpText = "Loop Computer Collection (Default 2 hours)", Default = false)]
+        [Option(HelpText = "Loop Computer Collection", Default = false)]
         public bool Loop { get; set; }
 
-        [Option(HelpText = "Duration to perform looping")]
+        [Option(HelpText = "Duration to perform looping (Default 2 hours)")]
         public TimeSpan LoopDuration { get; set; }
 
         [Option(HelpText = "Interval to sleep between loops")]

@@ -41,7 +41,13 @@ namespace SharpHound3.Producers
             {
                 foreach (var target in dcs)
                 {
-                    DomainControllerSids.Add(target.Key, target.Value);
+                    try
+                    {
+                        DomainControllerSids.Add(target.Key, target.Value);
+                    }
+                    catch
+                    {
+                    }
                 }
             }
         }

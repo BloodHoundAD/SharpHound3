@@ -82,7 +82,17 @@ namespace SharpHound3
 
             //If the user didn't specify a domain, pull the domain from DirectoryServices
             if (options.Domain == null)
-                options.Domain = System.DirectoryServices.ActiveDirectory.Domain.GetCurrentDomain().Name.ToUpper();
+                try
+                {
+                    options.Domain = System.DirectoryServices.ActiveDirectory.Domain.GetCurrentDomain().Name.ToUpper();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    Console.WriteLine("Unable to determine user's domain. Please manually specify it with the --domain flag");
+                    return;
+                }
+                
 
             //Check to make sure both LDAP options are set if either is set
             if ((options.LdapPassword != null && options.LdapUsername == null) ||
