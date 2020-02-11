@@ -10,8 +10,6 @@ namespace SharpHound3
     {
         public static Options Instance { get; set; }
 
-        internal TimeSpan defaultTimeSpan = TimeSpan.FromHours(8);
-
         //Collection Options
         [Option('c', "CollectionMethod", Default = new[] { "Default" }, HelpText = "Collection Methods: Group, LocalGroup, GPOLocalGroup, Session, LoggedOn, ObjectProps, ACL, ComputerOnly, Trusts, Default, RDP, DCOM, DCOnly")]
         public IEnumerable<string> CollectionMethods { get; set; }
@@ -19,7 +17,7 @@ namespace SharpHound3
         [Option(HelpText = "Use Stealth Targetting/Enumeration Options", Default = false)]
         public bool Stealth { get; set; }
 
-        [Option(HelpText = "Specify domain for enumeration", Default = null)]
+        [Option('d', HelpText = "Specify domain for enumeration", Default = null)]
         public string Domain { get; set; }
 
         [Option(HelpText = "Limit collection to Windows hosts only", Default = false)]
@@ -59,7 +57,7 @@ namespace SharpHound3
         [Option(HelpText = "Don't zip JSON files")]
         public bool NoZip { get; set; }
 
-        [Option(HelpText = "Invalidate and rebuld the cache")]
+        [Option(HelpText = "Invalidate and rebuild the cache")]
         public bool InvalidateCache { get; set; }
 
         //Connection Options
@@ -127,7 +125,7 @@ namespace SharpHound3
         [Option(HelpText = "Loop Computer Collection", Default = false)]
         public bool Loop { get; set; }
 
-        [Option(HelpText = "Duration to perform looping (Default 2 hours)")]
+        [Option(HelpText = "Duration to perform looping (Default 02:00:00)")]
         public TimeSpan LoopDuration { get; set; }
 
         [Option(HelpText = "Interval to sleep between loops")]

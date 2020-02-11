@@ -42,6 +42,7 @@ function Invoke-BloodHound{
             LocalAdmin - Collect local admin users for computers
             RDP - Collect remote desktop users for computers
             DCOM - Collect distributed COM users for computers
+			PSRemote - Collected members of the Remote Management Users group for computers
             Session - Collect session information for computers
             SessionLoop - Continuously collect session information until killed
             Trusts - Enumerate domain trust data
@@ -51,164 +52,161 @@ function Invoke-BloodHound{
             GPOLocalGroup - Collects Local Admin information using GPO (Group Policy Objects)
             LoggedOn - Collects session information using privileged methods (needs admin!)
             ObjectProps - Collects node property information for users and computers
+			SPNTargets - Collects SPN targets (currently only MSSQL)
             Default - Collects Group Membership, Local Admin, Sessions, and Domain Trusts
             DcOnly - Collects Group Membership, ACLs, ObjectProps, Trusts, Containers, and GPO Admins
-            All - Collect all data except GPOLocalGroup and LoggedOn
+            All - Collect all data except GPOLocalGroup
 
         This can be a list of comma seperated valued as well to run multiple collection methods!
+
+	.PARAMETER Stealth
+
+        Use stealth collection options, will sacrifice data quality in favor of much reduced
+        network impact
 
     .PARAMETER Domain
 
         Specifies the domain to enumerate. If not specified, will enumerate the current
         domain your user context specifies.
 
-    .PARAMETER SearchForest
+	.PARAMETER WindowsOnly
+	
+		Limits computer collection to systems that have an operatingssytem attribute that matches *Windows*
 
-        Expands data collection to include all domains in the forest. 
+	.PARAMETER ComputerFile
+
+        A file containing a list of computers to enumerate. This option can only be used with the following Collection Methods:
+        Session, SessionLoop, LocalGroup, ComputerOnly, LoggedOn
 
     .PARAMETER LdapFilter
 
         Append this ldap filter to the search filter to further filter the results enumerated
 
-    .PARAMETER Stealth
+    .PARAMETER OutputDirectory
 
-        Use stealth collection options, will sacrifice data quality in favor of much reduced
-        network impact
+        Folder to output files too
 
-    .PARAMETER SkipGCDeconfliction
+	.PARAMETER OutputPrefix
 
-        Skip's Global Catalog deconfliction during session enumeration. This option
-        can result in more inaccuracy in data.
+        Prefix to add to output files
 
-    .PARAMETER ComputerFile
+	
+	.PARAMETER PrettyJSON
 
-        A file containing a list of computers to enumerate. This option can only be used with the following Collection Methods:
-        Session, SessionLoop, LocalGroup, ComputerOnly, LoggedOn
+        Output "pretty" json with formatting for readability
 
-    .PARAMETER ExcludeDC
+	.PARAMETER CacheFilename
 
-        Exclude domain controllers from session queries. Useful for ATA environments which detect this behavior
-
-    .PARAMETER OU
-
-        Limit enumeration to this OU. Takes a DistinguishedName.
-        Ex. OU=Domain Controllers,DC=testlab,DC=local
-
-    .PARAMETER DomainController
-
-        Specify which Domain Controller to request data from. Defaults to closest DC using Site Names
-
-    .PARAMETER LdapPort
-
-        Override the port used to connect to LDAP
-
-    .PARAMETER SecureLdap
-
-        Uses LDAPs instead of unencrypted LDAP on port 636
-
-    .PARAMETER IgnoreLdapCert
-
-        Ignores the certificate for LDAP
-
-    .PARAMETER LDAPUser
-
-        User to connect to LDAP with
-
-    .PARAMETER LDAPPass
-
-        Password for user you are connecting to LDAP with
-
-    .PARAMETER DisableKerbSigning
-
-        Disables Kerberos Signing on requests.
-    
-    .PARAMETER Threads
-
-        Specifies the number of threads to use during enumeration (Default 20)
-
-    .PARAMETER PingTimeout
-
-        Specifies timeout for ping requests to computers in milliseconds (Default 750)
-
-    .PARAMETER SkipPing
-
-        Skip all ping checks for computers. This option will most likely be slower as
-        API calls will be made to all computers regardless of being up
-        Use this option if ping is disabled on the network for some reason
-
-    .PARAMETER LoopDelay
-
-        Amount of time to wait between session enumeration loops in minutes. This option
-        should be used in conjunction with the SessionLoop enumeration method. 
-        (Default 300 seconds)
-
-    .PARAMETER MaxLoopTime
-
-        Length of time to run looped session collection. Format: 0d0h0m0s or any variation of this format.
-        Use in conjunction with -c SessionLoop
-        Default will loop for two hours
-
-    .PARAMETER Throttle
-
-        Time in milliseconds to throttle after each request to a computer
-
-    .Parameter Jitter
-
-        Percentage jitter to apply to throttle
-
-    .PARAMETER JSONFolder
-
-        Folder to export JSONs too (Defaults to current directory)
-
-    .PARAMETER JSONPrefix
-
-        Prefix to add to your JSON Files (Default "")
-
-    .PARAMETER NoZip
-
-        Don't compress JSON files and remove them from disk
-
-    .PARAMETER EncryptZip
-
-        Add a random password to the zip file
-
-    .PARAMETER ZipFileName
-
-        Change the filename for the zip file
+        Name for the cache file dropped to disk (default: unique hash generated per machine)
 
     .PARAMETER RandomFilenames
 
-        Randomize output filenames
+        Randomize file names completely
 
-    .PARAMETER PrettyJson
+	.PARAMETER ZipFilename
 
-        Output pretty JSON at the cost of file size
+        Name for the zip file output by data collection
 
-    .PARAMETER CacheFile
+	.PARAMETER NoSaveCache
 
-        Filename for the cache used by bloodhound. (Default <B64 machine sid>.bin)
-    
-    .PARAMETER Invalidate
+        Don't write the cache file to disk. Caching will still be performed in memory.
 
-        Invalidate the cache and build a new one
+	.PARAMETER EncryptZip
 
-    .PARAMETER SaveCache
-        
-        Whether to save the cache file. Set this to false to disable writing it to disk
+        Encrypt the zip file with a random password
 
-    .PARAMETER Interval
+	.PARAMETER NoZip
 
-        Interval to display progress during enumeration in milliseconds (Default 30000)
+        Do NOT zip the json files
 
-    .PARAMETER Verbose
+	.PARAMETER InvalidateCache
 
-        Enable verbose output mode. Will print a lot!
+        Invalidate and rebuild the cache file
 
-    .PARAMETER OverrideUser
+	.PARAMETER LdapFilter
 
-        Overrides the 'current' user to filter it out of session enumeration.
-        Useful when you're using runas, as the user will be detected incorrectly
-        
+        Append this ldap filter to the search filter to further filter the results enumerated
+
+	.PARAMETER DomainController
+
+        Domain Controller to connect too. Specifiying this can result in data loss
+
+	.PARAMETER LdapPort
+
+        Port LDAP is running on. Defaults to 389/686 for LDAPS
+
+	.PARAMETER SecureLDAP
+
+        Connect to LDAPS (LDAP SSL) instead of regular LDAP
+	
+	.PARAMETER DisableKerberosSigning
+
+        Disables keberos signing/sealing, making LDAP traffic viewable
+
+	.PARAMETER LdapUsername
+
+        Username for connecting to LDAP. Use this if you're using a non-domain account for connecting to computers
+
+	.PARAMETER LdapPassword
+
+        Password for connecting to LDAP. Use this if you're using a non-domain account for connecting to computers
+
+	.PARAMETER SkipPortScan
+
+        Skip SMB port checks when connecting to computers
+
+	.PARAMETER PortScanTimeout
+
+        Timeout for SMB port checks
+
+	.PARAMETER ExcludeDomainControllers
+
+        Exclude domain controllers from enumeration (usefult o avoid Microsoft ATP/ATA)
+
+	.PARAMETER Throttle
+
+        Throttle requests to computers (in milliseconds)
+
+	.PARAMETER Jitter
+
+        Add jitter to throttle
+
+	.PARAMETER OverrideUserName
+
+        Override username to filter for NetSessionEnum
+
+	.PARAMETER NoRegistryLoggedOn
+
+        Disable remote registry check in LoggedOn collection
+
+	.PARAMETER DumpComputerStatus
+
+        Dumps error codes from attempts to connect to computers
+
+	.PARAMETER RealDNSName
+
+        Overrides the DNS name used for API calls
+
+	.PARAMETER CollectAllProperties
+
+        Collect all string LDAP properties on objects
+
+	.PARAMETER StatusInterval
+
+        Interval for displaying status in milliseconds
+
+	.PARAMETER Loop
+
+        Perform looping for computer collection
+
+	.PARAMETER LoopDuration
+
+        Duration to perform looping (Default 02:00:00)
+
+	.PARAMETER LoopInterval
+
+        Interval to sleep between loops (Default 00:05:00)
+
     .EXAMPLE
 
         PS C:\> Invoke-BloodHound
@@ -218,7 +216,7 @@ function Invoke-BloodHound{
 
     .EXAMPLE
         
-        PS C:\> Invoke-BloodHound -CollectionMethod SessionLoop -LoopDelay 60 -MaxLoopTime 10
+        PS C:\> Invoke-BloodHound -Loop -LoopInterval 00:01:00 -LoopDuration 00:10:00
     
         Executes session collection in a loop. Will wait 1 minute after each run to continue collection
         and will continue running for 10 minutes after which the script will exit
@@ -242,120 +240,113 @@ function Invoke-BloodHound{
         [String[]]
         $CollectionMethod = [string[]] @('Default'),
 
-        [Switch]
-        $SearchForest,
+		[Switch]
+        $Stealth,
 
         [String]
         $Domain,
 
+		[Switch]
+        WindowsOnly,
+
+		[String]
+        $ComputerFile,
+
+		[ValidateScript({ Test-Path -Path $_ })]
+        [String]
+        $OutputDirectory = $(Get-Location),
+
+		[ValidateNotNullOrEmpty()]
+        [String]
+        $OutputPrefix,
+
+		[Switch]
+        $PrettyJson,
+
+		[String]
+        $CacheFileName,
+
+		[Switch]
+        $RandomizeFilenames,
+
+		[Switch]
+        $ZipFilename,
+
+		[Switch]
+        $NoSaveCache,
+
+		[Switch]
+        $EncryptZip,
+
+		[Switch]
+        $InvalidateCache,
+
         [String]
         $LdapFilter,
 
-        [Switch]
-        $Stealth,
-
-        [Switch]
-        $SkipGCDeconfliction,
-
-        [Switch]
-        $ExcludeDC,
-
-        [String]
-        $ComputerFile,
-
-        [String]
-        $OU,
-
-        [string]
+		[string]
         $DomainController,
 
-        [int]
+		[int]
         $LdapPort,
 
         [Switch]
         $SecureLdap,
 
-        [Switch]
-        $IgnoreLdapCert,
-
-        [String]
-        $LDAPUser,
-
-        [String]
-        $LDAPPass,
-
-        [Switch]
+		[Switch]
         $DisableKerbSigning,
+        
+		[String]
+        $LdapUsername,
 
-        [ValidateRange(1,50)]
-        [Int]
-        $Threads = 10,
+        [String]
+        $LdapPassword,
 
-        [ValidateRange(50,1500)]
+		[Switch]
+        $SkipPortScan,
+
+		[ValidateRange(50,5000)]
         [int]
-        $PingTimeout = 250,
+        $PortScanTimeout = 2000,
 
         [Switch]
-        $SkipPing,
+        $ExcludeDomainControllers,
 
-        [ValidateRange(1,50000000)]
-        [int]
-        $LoopDelay,
-
-        [ValidatePattern('[0-9]+[smdh]')]
-        [string]
-        $MaxLoopTime,
-
-        [ValidateRange(0,100)]
+		[ValidateRange(0,100)]
         [int]
         $Jitter,
 
         [int]
         $Throttle,
-
-        [ValidateScript({ Test-Path -Path $_ })]
-        [String]
-        $JSONFolder = $(Get-Location),
-
-        [ValidateNotNullOrEmpty()]
-        [String]
-        $JSONPrefix,
-
-        [Switch]
-        $NoZip,
-
-        [Switch]
-        $EncryptZip,
-
-        [String]
-        $ZipFileName,
-
-        [Switch]
-        $RandomFilenames,
-
-        [Switch]
-        $PrettyJson,
         
+		[String]
+        $OverrideUsername,
 
-        [String]
-        [ValidateNotNullOrEmpty()]
-        $CacheFile,
+		[Switch]
+		$NoRegistryLoggedOn,
 
-        [Switch]
-        $Invalidate,
+		[Switch]
+		$DumpComputerStatus,
 
-        [Switch]
-        $NoSaveCache,
+		[String]
+		$RealDNSName,
 
-        [ValidateRange(500,60000)]
+		[Switch]
+		$CollectAllProperties,
+
+		[ValidateRange(500,60000)]
         [int]
         $StatusInterval,
 
-        [String]
-        $OverrideUser,
+		[Switch],
+		$Loop,
 
-        [Switch]
-        $Verbose
+		[String]
+		$LoopDuration,
+
+		[String]
+		$LoopInterval,
+        
     )
 
     $vars = New-Object System.Collections.Generic.List[System.Object]
@@ -370,33 +361,70 @@ function Invoke-BloodHound{
         $vars.Add($Domain);
     }
 
-    if ($SearchForest){
-        $vars.Add("-s");
-    }
-
     if ($Stealth){
         $vars.Add("--Stealth")
     }
 
-    if ($SkipGCDeconfliction){
-        $vars.Add("--SkipGCDeconfliction")
-    }
+	if ($WindowsOnly){
+		$vars.Add("--WindowsOnly")
+	}
 
-    if ($ExcludeDC){
-        $vars.Add("--ExcludeDC")
-    }
-
-    if ($ComputerFile){
+	if ($ComputerFile){
         $vars.Add("--ComputerFile");
         $vars.Add($ComputerFile);
     }
 
-    if ($OU){
-        $vars.Add("--OU");
-        $vars.Add($OU);
+
+	if ($OutputDirectory){
+        $vars.Add("--OutputDirectory");
+        $vars.Add($OutputDirectory);
     }
 
-    if ($DomainController){
+    if ($OutputPrefix){
+        $vars.Add("--OutputPrefix");
+        $vars.Add($OutputPrefix);
+    }
+
+	if ($PrettyJson){
+        $vars.Add("--PrettyJson");
+    }
+
+	if ($CacheFileName){
+        $vars.Add("--CacheFileName");
+        $vars.Add($CacheFileName);
+    }
+
+	 if ($RandomFilenames){
+        $vars.Add("--RandomizeFilenames");
+    }
+
+	if ($ZipFileName){
+        $vars.Add("--ZipFileName");
+        $vars.Add($ZipFileName);
+    }
+
+	if ($NoSaveCache){
+        $vars.Add("--NoSaveCache");
+    }
+
+	if ($EncryptZip){
+        $vars.Add("--EncryptZip");
+    }
+
+	if ($NoZip){
+        $vars.Add("--NoZip");
+    }
+
+	if ($InvalidateCache){
+        $vars.Add("--InvalidateCache");
+    }
+
+	if ($LdapFilter){
+        $vars.Add("--LdapFilter");
+        $vars.Add($LdapFilter);
+    }
+
+	if ($DomainController){
         $vars.Add("--DomainController");
         $vars.Add($DomainController);
     }
@@ -410,49 +438,35 @@ function Invoke-BloodHound{
         $vars.Add("--SecureLdap");
     }
 
-    if ($IgnoreLdapCert){
-        $vars.Add("--IgnoreLdapCert");
+	if ($DisableKerberosSigning){
+        $vars.Add("--DisableKerberosSigning");
     }
 
-    if ($LDAPUser){
-        $vars.Add("--LDAPUser");
-        $vars.Add($LDAPUser);
+	if ($LdapUsername){
+        $vars.Add("--LdapUsername");
+        $vars.Add($LdapUsername);
     }
 
-    if ($LDAPPass){
-        $vars.Add("--LDAPPass");
-        $vars.Add($LDAPPass);
+    if ($LdapPassword){
+        $vars.Add("--LdapPassword");
+        $vars.Add($LdapPassword);
     }
 
-    if ($DisableKerbSigning){
-        $vars.Add("--DisableKerbSigning");
+	if ($SkipPortScan){
+        $vars.Add("--SkipPortScan");
     }
 
-    if ($Threads){
-        $vars.Add("-t")
-        $vars.Add($Threads)
+	if ($PortScanTimeout){
+        $vars.Add("--PortScanTimeout")
+        $vars.Add($PortScanTimeout)
     }
 
-    if ($PingTimeout){
-        $vars.Add("--PingTimeout")
-        $vars.Add($PingTimeout)
+
+    if ($ExcludeDomainControllers){
+        $vars.Add("--ExcludeDomainControllers")
     }
 
-    if ($SkipPing){
-        $vars.Add("--SkipPing");
-    }
-
-    if ($LoopDelay){
-        $vars.Add("--LoopDelay")
-        $vars.Add($LoopDelay)
-    }
-
-    if ($MaxLoopTime){
-        $vars.Add("--MaxLoopTime")
-        $vars.Add($MaxLoopTime)
-    }
-
-    if ($Throttle){
+	if ($Throttle){
         $vars.Add("--Throttle");
         $vars.Add($Throttle);
     }
@@ -462,68 +476,47 @@ function Invoke-BloodHound{
         $vars.Add($Jitter);
     }
 
-    if ($JSONFolder){
-        $vars.Add("--JSONFolder");
-        $vars.Add($JSONFolder);
+	if ($OverrideUserName){
+        $vars.Add("--OverrideUserName")
+        $vars.Add($OverrideUsername)
     }
+    
+	if ($NoRegistryLoggedOn){
+		$vars.Add("--NoRegistryLoggedOn")
+	}
 
-    if ($JSONPrefix){
-        $vars.Add("--JSONPrefix");
-        $vars.Add($JSONPrefix);
-    }
+	if ($DumpComputerStatus){
+		$vars.Add("--DumpComputerStatus")
+	}
 
-    if ($NoZip){
-        $vars.Add("--NoZip");
-    }
+	if ($RealDNSName){
+		$vars.Add("--RealDNSName")
+		$vars.Add($RealDNSName)
+	}
 
-    if ($EncryptZip){
-        $vars.Add("--EncryptZip");
-    }
-
-    if ($ZipFileName){
-        $vars.Add("--ZipFileName");
-        $vars.Add($ZipFileName);
-    }
-
-    if ($RandomFilenames){
-        $vars.Add("--RandomFilenames");
-    }
-
-    if ($PrettyJson){
-        $vars.Add("--PrettyJson");
-    }
-
-    if ($CacheFile){
-        $vars.Add("--CacheFile");
-        $vars.Add($CacheFile);
-    }
-
-    if ($Invalidate){
-        $vars.Add("--Invalidate");
-    }
-
-    if ($NoSaveCache){
-        $vars.Add("--NoSaveCache");
-    }
-
-    if ($LdapFilter){
-        $vars.Add("--LdapFilter");
-        $vars.Add($LdapFilter);
-    }
-
-    if ($Verbose){
-        $vars.Add("-v")
-    }
-
-    if ($StatusInterval){
+	if ($CollectAllProperties){
+		$vars.Add("--CollectAllProperties")
+	}
+    
+	if ($StatusInterval){
         $vars.Add("--StatusInterval")
         $vars.Add($StatusInterval)
     }
 
-    if ($OverrideUser){
-        $vars.Add("--OverrideUser")
-        $vars.Add($OverrideUser)
-    }
+	if ($Loop){
+		$vars.Add("--Loop")
+	}
+
+	if ($LoopDuration){
+		$vars.Add("--LoopDuration")
+		$vars.Add($LoopDuration)
+	}
+
+	if ($LoopInterval){
+		$vars.Add("--LoopInterval")
+		$vars.Add($LoopInterval)
+	}
+
 
     $passed = [string[]]$vars.ToArray()
 
