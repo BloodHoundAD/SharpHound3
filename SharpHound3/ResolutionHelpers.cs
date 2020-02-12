@@ -257,6 +257,10 @@ namespace SharpHound3
             string accountDomain)
         {
             var domain = Helpers.NormalizeDomainName(accountDomain);
+            //If we have a space in the domain name, its most likely NT AUTHORITY or some other variation, and its not a valid name either way. Ignore it
+            if (domain.Contains(" "))
+                return (false, null, LdapTypeEnum.Unknown);
+
             var key = new UserDomainKey
             {
                 AccountDomain = domain,

@@ -112,7 +112,11 @@ namespace SharpHound3.Tasks
                         continue;
 
                     //Remove blank accounts and computer accounts
-                    if (username.Trim() == "" || username.EndsWith("$"))
+                    if (username.Trim() == "" || username.EndsWith("$") || username == "ANONYMOUS LOGON" || username == Options.Instance.CurrentUserName)
+                        continue;
+
+                    //Any domain with a space is unusable (ex: NT AUTHORITY, FONT DRIVER HOST)
+                    if (domain.Contains(" "))
                         continue;
 
                     var (rSuccess, sid, _) = await ResolutionHelpers.ResolveAccountNameToSidAndType(username, domain);
