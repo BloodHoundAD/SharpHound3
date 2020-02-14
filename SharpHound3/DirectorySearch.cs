@@ -75,6 +75,10 @@ namespace SharpHound3
                     return null;
                 }
             }
+            catch (LdapException)
+            {
+                return null;
+            }
             finally
             {
                 //Always dispose GC connections
