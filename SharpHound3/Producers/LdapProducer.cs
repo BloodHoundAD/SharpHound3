@@ -22,7 +22,7 @@ namespace SharpHound3.Producers
             var token = Helpers.GetCancellationToken();
             OutputTasks.StartOutputTimer();
             //Do a basic  LDAP search and grab results
-            foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree))
+            foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree,Options.Instance.SearchBase))
             {
                 //If our cancellation token is set, cancel out of our loop
                 if (token.IsCancellationRequested)

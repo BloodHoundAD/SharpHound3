@@ -59,6 +59,10 @@
 
         Append this ldap filter to the search filter to further filter the results enumerated
 
+	.PARAMETER SearchBase
+
+		DistinguishedName to start LDAP searches at. Equivalent to the old --OU option
+
     .PARAMETER OutputDirectory
 
         Folder to output files too

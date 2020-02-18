@@ -84,6 +84,9 @@ namespace SharpHound3
 
 
         //Enumeration Options
+        [Option(HelpText = "Base DistinguishedName to start search at. Use this to limit your search. Equivalent to the old --OU option", Default = null)]
+        public string SearchBase { get; set; }
+
         [Option(HelpText = "Skip SMB port checks when connecting to computers", Default = false)]
         public bool SkipPortScan { get; set; }
 

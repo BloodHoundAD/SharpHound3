@@ -63,7 +63,7 @@ namespace SharpHound3.Producers
 
                 OutputTasks.StartOutputTimer();
                 //Output our stealth targets to the queue
-                foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree))
+                foreach (var searchResult in Searcher.QueryLdap(Query, Props, SearchScope.Subtree, Options.Instance.SearchBase))
                 {
                     if (token.IsCancellationRequested)
                     {
