@@ -340,6 +340,7 @@ namespace SharpHound3.Tasks
             var dontReqPreAuth = false;
             var passwdNotReq = false;
             var unconstrained = false;
+            var pwdNeverExires = false;
             if (int.TryParse(userAccountControl, out var baseFlags))
             {
                 var uacFlags = (UacFlags)baseFlags;
@@ -349,6 +350,7 @@ namespace SharpHound3.Tasks
                 dontReqPreAuth = (uacFlags & UacFlags.DontReqPreauth) != 0;
                 passwdNotReq = (uacFlags & UacFlags.PasswordNotRequired) != 0;
                 unconstrained = (uacFlags & UacFlags.TrustedForDelegation) != 0;
+                pwdNeverExires = (uacFlags & UacFlags.DontExpirePassword) != 0;
             }
 
             wrapper.Properties.Add("dontreqpreauth", dontReqPreAuth);
@@ -356,6 +358,7 @@ namespace SharpHound3.Tasks
             wrapper.Properties.Add("unconstraineddelegation", unconstrained);
             wrapper.Properties.Add("sensitive", sensitive);
             wrapper.Properties.Add("enabled", enabled);
+            wrapper.Properties.Add("pwdneverexpires", pwdNeverExires);
 
             var trustedToAuthComputers = new List<string>();
             // Parse Allowed To Delegate
