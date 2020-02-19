@@ -32,7 +32,7 @@ namespace SharpHound3.Tasks
                 {
                     var sessions = new List<Session>();
                     sessions.AddRange(await GetLoggedOnUsersAPI(computer));
-                    sessions.AddRange(GetLoggedOnUsersRegistry(computer));
+                    sessions.AddRange(await GetLoggedOnUsersRegistry(computer));
                     var temp = computer.Sessions.ToList();
                     temp.AddRange(sessions);
                     computer.Sessions = temp.Distinct().ToArray();
