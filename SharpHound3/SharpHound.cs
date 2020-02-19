@@ -104,7 +104,7 @@ namespace SharpHound3
 
             //Initial LDAP connection test. Search for the well known administrator SID to make sure we can connect successfully.
             var searcher = Helpers.GetDirectorySearcher(options.Domain);
-            var result = await searcher.GetOne($"(objectsid={Helpers.ConvertSidToHexSid("S-1-5-32-544")})", new[] { "objectsid" },
+            var result = await searcher.GetOne("(objectclass=domain)", new[] { "objectsid" },
                 SearchScope.Subtree);
 
             //If we get nothing back from LDAP, something is wrong
