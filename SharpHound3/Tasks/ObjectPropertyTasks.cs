@@ -143,13 +143,13 @@ namespace SharpHound3.Tasks
             if (property.EndsWith("0Z"))
             {
                 var dt = DateTime.ParseExact(property, "yyyyMMddHHmmss.0K", CultureInfo.CurrentCulture);
-                return $"TMSTMP-{(long)dt.Subtract(WindowsEpoch).TotalSeconds}";
+                return (long)dt.Subtract(WindowsEpoch).TotalSeconds;
             }
 
             //This string corresponds to the max int, and is usually set in accountexpires
             if (property == "9223372036854775807")
             {
-                return "Never";
+                return -1;
             }
 
             return property;
@@ -428,14 +428,14 @@ namespace SharpHound3.Tasks
         /// </summary>
         /// <param name="ldapTime"></param>
         /// <returns></returns>
-        private static string ConvertToUnixEpoch(string ldapTime)
+        private static long ConvertToUnixEpoch(string ldapTime)
         {
             if (ldapTime == null)
-                return "Never";
+                return -1;
 
             var time = long.Parse(ldapTime);
             if (time == 0)
-                return "Never";
+                return -1;
 
             long toReturn;
 
@@ -448,14 +448,14 @@ namespace SharpHound3.Tasks
                 toReturn = -1;
             }
 
-            return $"TMSTMP-{toReturn}";
+            return toReturn;
         }
 
         [DllImport("Advapi32", SetLastError = false)]
-        static extern bool IsTextUnicode(byte[] buf, int len, ref IsTextUnicodeFlags opt);
+        private static extern bool IsTextUnicode(byte[] buf, int len, ref IsTextUnicodeFlags opt);
 
         [Flags]
-        enum IsTextUnicodeFlags : int
+        private enum IsTextUnicodeFlags : int
         {
             IS_TEXT_UNICODE_ASCII16 = 0x0001,
             IS_TEXT_UNICODE_REVERSE_ASCII16 = 0x0010,
