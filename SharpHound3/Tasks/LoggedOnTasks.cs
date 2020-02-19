@@ -147,20 +147,52 @@ namespace SharpHound3.Tasks
             }
         }
 
-        private static IEnumerable<Session> GetLoggedOnUsersRegistry(Computer computer)
+        private static async Task<List<Session>> GetLoggedOnUsersRegistry(Computer computer)
         {
+            var sessionList = new List<Session>();
             if (Options.Instance.NoRegistryLoggedOn)
-                yield break;
+                return sessionList;
 
             RegistryKey key = null;
-            IEnumerable<string> filteredKeys;
             try
             {
                 //Try to open the remote base key
-                key = RegistryKey.OpenRemoteBaseKey(RegistryHive.Users, computer.APIName);
+                var task = Task.Run(() => RegistryKey.OpenRemoteBaseKey(RegistryHive.Users, computer.APIName));
+                if (await Task.WhenAny(task, Task.Delay(10000)) != task)
+                {
+                    if (Options.Instance.DumpComputerStatus)
+                        OutputTasks.AddComputerStatus(new ComputerStatus
+                        {
+                            ComputerName = computer.DisplayName,
+                            Status = "Timeout",
+                            Task = "RegistryLoggedOn"
+                        });
+
+                    return sessionList;
+                }
+
+                key = task.Result;
 
                 //Find subkeys where the regex matches
-                filteredKeys = key.GetSubKeyNames().Where(subkey => SidRegex.IsMatch(subkey));
+                var filteredKeys = key.GetSubKeyNames().Where(subkey => SidRegex.IsMatch(subkey));
+
+                foreach (var sid in filteredKeys)
+                {
+                    sessionList.Add(new Session
+                    {
+                        ComputerId = computer.ObjectIdentifier,
+                        UserId = sid
+                    });
+                }
+
+                if (Options.Instance.DumpComputerStatus)
+                    OutputTasks.AddComputerStatus(new ComputerStatus
+                    {
+                        ComputerName = computer.DisplayName,
+                        Status = "Success",
+                        Task = "RegistryLoggedOn"
+                    });
+                return sessionList;
             }
             catch (Exception e)
             {
@@ -171,30 +203,13 @@ namespace SharpHound3.Tasks
                         Status = e.Message,
                         Task = "RegistryLoggedOn"
                     });
-                yield break;
+                return sessionList;
             }
             finally
             {
                 //Ensure we dispose of the registry key
                 key?.Dispose();
             }
-
-            foreach (var sid in filteredKeys)
-            {
-                yield return new Session
-                {
-                    ComputerId = computer.ObjectIdentifier,
-                    UserId = sid
-                };
-            }
-
-            if (Options.Instance.DumpComputerStatus)
-                OutputTasks.AddComputerStatus(new ComputerStatus
-                {
-                    ComputerName = computer.DisplayName,
-                    Status = "Success",
-                    Task = "RegistryLoggedOn"
-                });
         }
 
         #region NetWkstaGetInfo
