@@ -416,8 +416,14 @@ namespace SharpHound3.Tasks
 
                                     type = lType;
                                 }
+                                else
+                                {
+                                    var (aSid, lType) = await ResolutionHelpers.ResolveSidAndGetType(sid, gpoDomain);
+                                    sid = aSid;
+                                    type = lType;
+                                }
 
-                                if (sid == null || !sid.StartsWith("S-1-5", StringComparison.OrdinalIgnoreCase))
+                                if (sid == null)
                                     continue;
 
                                 // Loop over matches and add the actions appropriately
