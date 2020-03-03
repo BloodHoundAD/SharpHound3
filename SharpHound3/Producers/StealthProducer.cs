@@ -116,12 +116,12 @@ namespace SharpHound3.Producers
 
                 // Loop over each possibility, and grab the hostname from the path, adding it to a list
                 foreach (var s in poss)
-                  {
-                      var split = s?.Split('\\');
-                      if (!(split?.Length >= 3)) continue;
-                      var path = split[2];
-                      paths.TryAdd(path, new byte());
-                  }
+                {
+                    var split = s?.Split('\\');
+                    if (!(split?.Length >= 3)) continue;
+                    var path = split[2];
+                    paths.TryAdd(path, new byte());
+                }
               });
 
 

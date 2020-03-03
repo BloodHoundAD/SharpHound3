@@ -402,7 +402,7 @@ namespace SharpHound3.Tasks
 
             var sidHistory = result.GetPropertyAsArrayOfBytes("sidhistory");
             var sidHistoryList = new List<string>();
-            var sidHistoryPrincipals = new List<ResolvedPrincipal>();
+            var sidHistoryPrincipals = new List<GenericMember>();
             foreach (var sid in sidHistory)
             {
                 var s = Helpers.CreateSecurityIdentifier(sid)?.Value;
@@ -411,10 +411,10 @@ namespace SharpHound3.Tasks
                     sidHistoryList.Add(s);
                     var sidType = await ResolutionHelpers.LookupSidType(s, wrapper.Domain);
                     if (sidType != LdapTypeEnum.Unknown)
-                        sidHistoryPrincipals.Add(new ResolvedPrincipal
+                        sidHistoryPrincipals.Add(new GenericMember
                         {
-                            ObjectIdentifier = s,
-                            ObjectType = sidType
+                            MemberId=  s,
+                            MemberType = sidType
                         });
                 }
             }

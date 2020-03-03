@@ -17,6 +17,6 @@ namespace SharpHound3.LdapWrappers
 
         public string PrimaryGroupSid { get; set; }
 
-        public ResolvedPrincipal[] HasSIDHistory { get; set; }
+        public GenericMember[] HasSIDHistory { get; set; }
     }
 }
