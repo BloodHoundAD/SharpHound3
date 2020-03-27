@@ -11,7 +11,7 @@ namespace SharpHound3
         public static Options Instance { get; set; }
 
         //Collection Options
-        [Option('c', "CollectionMethod", Default = new[] { "Default" }, HelpText = "Collection Methods: Group, LocalGroup, GPOLocalGroup, Session, LoggedOn, ObjectProps, ACL, ComputerOnly, Trusts, Default, RDP, DCOM, DCOnly")]
+        [Option('c', "CollectionMethod", Default = new[] { "Default" }, HelpText = "Collection Methods: Container, Group, LocalGroup, GPOLocalGroup, Session, LoggedOn, ObjectProps, ACL, ComputerOnly, Trusts, Default, RDP, DCOM, DCOnly")]
         public IEnumerable<string> CollectionMethods { get; set; }
 
         [Option(HelpText = "Use Stealth Targetting/Enumeration Options", Default = false)]
