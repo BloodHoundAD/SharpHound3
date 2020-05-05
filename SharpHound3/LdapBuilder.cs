@@ -101,6 +101,12 @@ namespace SharpHound3
                 });
             }
 
+            //Make sure we get containers/OUs if we're doing gentleenum
+            if (Options.Instance.GentleLdap)
+            {
+                ldapFilterParts.Add("(|(objectcategory=organizationalUnit)(objectcategory=container)(objectcategory=builtinDomain))");
+            }
+
             //Take our query parts, and join them together
             var finalFilter = string.Join("", ldapFilterParts.ToArray());
             //Surround the filters with (|), which will OR them together

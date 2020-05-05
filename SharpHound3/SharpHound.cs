@@ -102,7 +102,7 @@ namespace SharpHound3
                 return;
             }
 
-            //Initial LDAP connection test. Search for the well known administrator SID to make sure we can connect successfully.
+            //Initial LDAP connection test. Search for domain objects to see if we can connect successfully
             var searcher = Helpers.GetDirectorySearcher(options.Domain);
             var result = await searcher.GetOne("(objectclass=domain)", new[] { "objectsid" },
                 SearchScope.Subtree);

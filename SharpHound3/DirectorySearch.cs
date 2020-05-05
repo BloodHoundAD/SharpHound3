@@ -24,7 +24,9 @@ namespace SharpHound3
         private readonly string baseLdapPath;
         //Thread-safe storage for our Ldap Connection Pool
         private readonly ConcurrentBag<LdapConnection> _connectionPool = new ConcurrentBag<LdapConnection>();
-
+        private readonly List<string> _usableDomainControllers = new List<string>();
+        private readonly Random _rand = new Random();
+        
         public DirectorySearch(string domainName = null, string domainController = null)
         {
             _domainName = Helpers.NormalizeDomainName(domainName);
@@ -32,6 +34,48 @@ namespace SharpHound3
             _domainController = Options.Instance.DomainController ?? domainController;
             _domainGuidMap = new Dictionary<string, string>();
             CreateSchemaMap();
+
+            if (Options.Instance.RoundRobinDC)
+            {
+                FindUsableDomainControllers();
+            }
+        }
+
+        internal void FindUsableDomainControllers()
+        {
+            foreach (var entry in QueryLdap(
+                "(&(objectclass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))", new[] {"samaccountname"},
+                SearchScope.Subtree))
+            {
+                var dcName = entry.GetProperty("samaccountname").TrimEnd('$');
+                if (TestDomainController(dcName))
+                {
+                    _usableDomainControllers.Add(dcName);
+                }
+            }
+        }
+
+        private static bool TestDomainController(string domainController)
+        {
+            var port = Options.Instance.LdapPort == 0
+                ? (Options.Instance.SecureLDAP ? 636 : 389)
+                : Options.Instance.LdapPort;
+            var identifier = new LdapDirectoryIdentifier(domainController, port, false, false);
+            var connection = Options.Instance.LdapUsername != null ? new LdapConnection(identifier, new NetworkCredential(Options.Instance.LdapUsername, Options.Instance.LdapPassword)) : new LdapConnection(identifier);
+            try
+            {
+                connection.Bind();
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                connection.Dispose();
+            }
+
+            return true;
         }
 
         //Look up a username in the Global Catalog to get a list of potential domains a session can come from
@@ -143,7 +187,7 @@ namespace SharpHound3
         /// <param name="adsPath"></param>
         /// <param name="globalCatalog"></param>
         /// <returns>An IEnumerable with search results</returns>
-        internal IEnumerable<SearchResultEntry> QueryLdap(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false)
+        internal IEnumerable<SearchResultEntry> QueryLdap(string ldapFilter, string[] props, SearchScope scope, string adsPath = null, bool globalCatalog = false, bool isMain = false)
         {
             var connection = globalCatalog ? GetGlobalCatalogConnection() : GetLdapConnection();
             try
@@ -170,9 +214,13 @@ namespace SharpHound3
                     }
                     catch (Exception e)
                     {
-                        //Console.WriteLine(ldapFilter);
-                        //Console.WriteLine("\nUnexpected exception occured:\n\t{0}: {1}",
-                        //    e.GetType().Name, e.Message);
+                        if (isMain)
+                        {
+                            Console.WriteLine("\nUnexpected exception occured in main LDAP query:\n\t{0}: {1}",
+                                e.GetType().Name, e.Message);
+                            Console.WriteLine("Data is likely incomplete.");
+                        }
+
                         yield break;
                     }
 
@@ -329,7 +377,17 @@ namespace SharpHound3
                 return connection;
             }
 
-            var domainController = _domainController ?? _domainName;
+            string domainController;
+            if (Options.Instance.RoundRobinDC && _usableDomainControllers.Count > 0)
+            {
+                domainController = _usableDomainControllers[_rand.Next(_usableDomainControllers.Count)];
+            }
+            else
+            {
+                domainController = _domainController ?? _domainName;
+            }
+            
+
             var port = Options.Instance.LdapPort == 0
                 ? (Options.Instance.SecureLDAP ? 636 : 389)
                 : Options.Instance.LdapPort;
@@ -349,6 +407,7 @@ namespace SharpHound3
             ldapSessionOptions.SendTimeout = new TimeSpan(0,0,10,0);
 
             connection.Timeout = new TimeSpan(0,0, 10, 0);
+            connection.AuthType = AuthType.Kerberos;
             return connection;
         }
 

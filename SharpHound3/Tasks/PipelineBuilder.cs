@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.DirectoryServices.Protocols;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using SharpHound3.Enums;
@@ -26,6 +27,9 @@ namespace SharpHound3.Tasks
             else if (options.ComputerFile != null)
             {
                 producer = new ComputerFileProducer(domain, null, ldapVariables.LdapProperties);
+            }else if (options.GentleLdap)
+            {
+                producer = new GentleLdapProducer(domain, ldapVariables.LdapFilter, ldapVariables.LdapProperties);
             }
             else
             {

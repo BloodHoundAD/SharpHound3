@@ -156,7 +156,7 @@ namespace SharpHound3.Tasks
             //Null wrappers happen when we cant resolve the object type. Shouldn't ever happen, but just in case, return null here
             if (wrapper == null)
             {
-                Console.WriteLine($"Null Wrapper: {distinguishedName}");
+                //Console.WriteLine($"Null Wrapper: {distinguishedName}");
                 return null;
             }
 

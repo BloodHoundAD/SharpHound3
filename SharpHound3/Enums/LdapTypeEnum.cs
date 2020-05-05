@@ -16,6 +16,7 @@ namespace SharpHound3.Enums
         GPO,
         Domain,
         OU,
+        Container,
         Unknown
     }
 }

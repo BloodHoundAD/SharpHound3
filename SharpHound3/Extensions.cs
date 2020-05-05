@@ -229,6 +229,9 @@ namespace SharpHound3
                 else if (objectClasses.Contains("domain"))
                 {
                     objectType = LdapTypeEnum.Domain;
+                }else if (objectClasses.Contains("container") || objectClasses.Contains("builtinDomain"))
+                {
+                    objectType = LdapTypeEnum.Container;
                 }
             }
 

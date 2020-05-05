@@ -115,6 +115,7 @@
     <Compile Include="LdapWrappers\User.cs" />
     <Compile Include="Producers\BaseProducer.cs" />
     <Compile Include="Producers\ComputerFileProducer.cs" />
+    <Compile Include="Producers\GentleLdapProducer.cs" />
     <Compile Include="Producers\StealthProducer.cs" />
     <Compile Include="ResolutionHelpers.cs" />
     <Compile Include="SharpHound.cs" />

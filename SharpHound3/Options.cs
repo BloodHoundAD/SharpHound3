@@ -67,6 +67,12 @@ namespace SharpHound3
         [Option(HelpText = "Domain Controller to connect too. Specifying this value can result in data loss", Default = null)]
         public string DomainController { get; set; }
 
+        [Option(HelpText = "Make requests to multiple domain controllers to even out load on individual ones", Default = false)]
+        public bool RoundRobinDC { get; set; }
+
+        [Option(HelpText = "Use partitioning of the directory to reduce load on domain controllers", Default = false)]
+        public bool GentleLdap { get; set; }
+
         [Option(HelpText = "Port LDAP is running on. Defaults to 389/636 for LDAPS", Default = 0)]
         public int LdapPort { get; set; }
 
@@ -81,7 +87,6 @@ namespace SharpHound3
 
         [Option(HelpText = "Password to use for LDAP", Default = null)]
         public string LdapPassword { get; set; }
-
 
         //Enumeration Options
         [Option(HelpText = "Base DistinguishedName to start search at. Use this to limit your search. Equivalent to the old --OU option", Default = null)]
