@@ -355,7 +355,7 @@ namespace SharpHound3.Tasks
             const string space = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
             var builder = new StringBuilder();
             var random = new Random();
-            for (var i = 0; i < 10; i++)
+            for (var i = 0; i < 20; i++)
             {
                 builder.Append(space[random.Next(space.Length)]);
             }
