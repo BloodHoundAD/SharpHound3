@@ -326,7 +326,10 @@
 		$LoopDuration,
 
 		[String]
-		$LoopInterval
+		$LoopInterval,
+
+        [String]
+        $SearchBase
         
     )
 
@@ -495,6 +498,11 @@
 	if ($LoopInterval){
 		$vars.Add("--LoopInterval")
 		$vars.Add($LoopInterval)
+	}
+
+    if ($SearchBase){
+        $vars.Add("--SearchBase")
+        $vars.Add($SearchBase)
 	}
 
     $passed = [string[]]$vars.ToArray()
