@@ -104,10 +104,6 @@
 
         Invalidate and rebuild the cache file
 
-	.PARAMETER LdapFilter
-
-        Append this ldap filter to the search filter to further filter the results enumerated
-
 	.PARAMETER DomainController
 
         Domain Controller to connect too. Specifiying this can result in data loss
@@ -264,6 +260,9 @@
 
         [String]
         $LdapFilter,
+	
+	[String]
+	$SearchBase,
 
 		[string]
         $DomainController,
@@ -405,6 +404,10 @@
 	if ($LdapFilter){
         $vars.Add("--LdapFilter");
         $vars.Add($LdapFilter);
+    }
+        if ($SearchBase){
+        $vars.Add("--SearchBase");
+        $vars.Add($SearchBase);
     }
 
 	if ($DomainController){
