@@ -172,6 +172,6 @@
   </Target>
   <Import Project="..\packages\Fody.6.0.6\build\Fody.targets" Condition="Exists('..\packages\Fody.6.0.6\build\Fody.targets')" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ep bypass -c ". '$(ProjectDir)\PowerShell Output\Out-CompressedDLL.ps1';Out-CompressedDll -FilePath '$(TargetPath)' -TemplatePath '$(ProjectDir)\PowerShell Output\Template.ps1' | Out-File -Encoding ASCII '$(TargetDir)$(TargetName).ps1'"</PostBuildEvent>
+    <PostBuildEvent>powershell -ep bypass -c ". '$(ProjectDir)PowerShell Output\Out-CompressedDLL.ps1';Out-CompressedDll -FilePath '$(TargetPath)' -TemplatePath '$(ProjectDir)\PowerShell Output\Template.ps1' | Out-File -Encoding ASCII '$(TargetDir)$(TargetName).ps1'"</PostBuildEvent>
   </PropertyGroup>
 </Project>

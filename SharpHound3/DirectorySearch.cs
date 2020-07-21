@@ -373,7 +373,15 @@ namespace SharpHound3
             {
                 var name = result.GetProperty("name");
                 var guid = new Guid(result.GetPropertyAsBytes("schemaidguid")).ToString();
-                map.Add(guid, name);
+                try
+                {
+                    map.Add(guid, name);
+                }
+                catch
+                {
+                    //pass
+                }
+                
             }
 
             _domainGuidMap = map;
