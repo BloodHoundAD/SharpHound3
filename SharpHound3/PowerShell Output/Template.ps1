@@ -260,6 +260,9 @@
         $EncryptZip,
 
 		[Switch]
+        $NoZip,
+
+		[Switch]
         $InvalidateCache,
 
         [String]
