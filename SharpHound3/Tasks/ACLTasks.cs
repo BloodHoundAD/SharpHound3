@@ -295,7 +295,7 @@ namespace SharpHound3.Tasks
                                     IsInherited = isInherited
                                 });
                             }
-                            else if (mappedGuid != null && mappedGuid == "ms-Mcs-AdmPwd")
+                            else if (mappedGuid != null && mappedGuid.ToLower() == "ms-mcs-admpwd")
                             {
                                 aces.Add(new ACL
                                 {
