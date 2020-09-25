@@ -232,11 +232,18 @@ namespace SharpHound3
     {
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            IDictionary<UserDomainKey, ResolvedPrincipal> dict = (IDictionary<UserDomainKey, ResolvedPrincipal>)value;
-            JObject obj = new JObject();
+            var dict = (IDictionary<UserDomainKey, ResolvedPrincipal>)value;
+            var obj = new JObject();
             foreach (var kvp in dict)
             {
-                obj.Add(kvp.Key.ToString(), JToken.FromObject(kvp.Value));
+                try
+                {
+                    obj.Add(kvp.Key.ToString(), JToken.FromObject(kvp.Value));
+                }
+                catch
+                {
+                    // ignored
+                }
             }
             obj.WriteTo(writer);
         }
@@ -251,7 +258,15 @@ namespace SharpHound3
                 var split = prop.Name.Split('\\');
                 key.AccountDomain = split[0];
                 key.AccountName = split[1];
-                dict.Add(key, prop.Value.ToObject<ResolvedPrincipal>());
+                try
+                {
+                    dict.Add(key, prop.Value.ToObject<ResolvedPrincipal>());
+                }
+                catch
+                {
+                    //ignored
+                }
+                
             }
             return dict;
         }
