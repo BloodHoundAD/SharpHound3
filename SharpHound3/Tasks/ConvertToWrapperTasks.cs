@@ -112,8 +112,7 @@ namespace SharpHound3.Tasks
                         DisplayName = $"{accountName}@{accountDomain}".ToUpper()
                     };
 
-                    if (objectIdentifier.EndsWith("-512") || objectIdentifier.EndsWith("-516") || objectIdentifier.EndsWith("-519") ||
-                        objectIdentifier.EndsWith("-520") || objectIdentifier.EndsWith("S-1-5-32-544") || objectIdentifier.EndsWith("S-1-5-32-550") ||
+                    if (objectIdentifier.EndsWith("-512") || objectIdentifier.EndsWith("-516") || objectIdentifier.EndsWith("-519") || objectIdentifier.EndsWith("S-1-5-32-544") || objectIdentifier.EndsWith("S-1-5-32-550") ||
                         objectIdentifier.EndsWith("S-1-5-32-549") || objectIdentifier.EndsWith("S-1-5-32-551") || objectIdentifier.EndsWith("S-1-5-32-548"))
                     {
                         wrapper.Properties.Add("highvalue", true);
