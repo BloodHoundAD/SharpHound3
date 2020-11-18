@@ -276,7 +276,7 @@
         $SecureLdap,
 
 		[Switch]
-        $DisableKerbSigning,
+        $DisableKerberosSigning,
         
 		[String]
         $LdapUsername,
