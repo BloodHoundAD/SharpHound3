@@ -217,6 +217,7 @@
         Randomizes filenames of the JSON files and the zip file and adds a password to the zip file
     #>
 
+    [CmdletBinding(PositionalBinding=$false)]
     param(
         [String[]]
         $CollectionMethod = [string[]] @('Default'),
@@ -335,9 +336,11 @@
 
     $vars = New-Object System.Collections.Generic.List[System.Object]
 
-    $vars.Add("-c")
-    foreach ($cmethod in $CollectionMethod){
-        $vars.Add($cmethod);
+    if ($CollectionMethod){
+        $vars.Add("--CollectionMethod");
+        foreach ($cmethod in $CollectionMethod){
+            $vars.Add($cmethod);
+        }
     }
     
     if ($Domain){
@@ -454,7 +457,7 @@
         $vars.Add($Throttle);
     }
 
-    if ($Jitter){
+    if ($Jitter -gt 0){
         $vars.Add("--Jitter");
         $vars.Add($Jitter);
     }
