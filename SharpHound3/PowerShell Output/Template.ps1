@@ -221,11 +221,11 @@
         Runs ACL, ObjectProps, Container, and Default collection methods, compresses the data to a zip file,
         and then removes the JSON files from disk
 
-    .EXAMPLE (Opsec!)
+    .EXAMPLE
 
         PS C:\> Invoke-BloodHound -CollectionMethod DCOnly --NoSaveCache --RandomFilenames --EncryptZip
     
-        Run LDAP only collection methods (Groups, Trusts, ObjectProps, ACL, Containers, GPO Admins) without outputting the cache file to disk. 
+        (Opsec!) Run LDAP only collection methods (Groups, Trusts, ObjectProps, ACL, Containers, GPO Admins) without outputting the cache file to disk.
         Randomizes filenames of the JSON files and the zip file and adds a password to the zip file
     #>
 
