@@ -80,7 +80,7 @@
 
         Name for the cache file dropped to disk (default: unique hash generated per machine)
 
-    .PARAMETER RandomFilenames
+    .PARAMETER RandomizeFilenames
 
         Randomize file names completely
 
@@ -380,7 +380,7 @@
         $vars.Add($CacheFileName);
     }
 
-	 if ($RandomFilenames){
+     if ($RandomizeFilenames){
         $vars.Add("--RandomizeFilenames");
     }
 
