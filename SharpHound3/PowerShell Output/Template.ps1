@@ -188,6 +188,18 @@
 
         Interval to sleep between loops (Default 00:05:00)
 
+    .PARAMETER V
+
+        Enable Verbose Output
+
+    .PARAMETER Help
+
+        Display this help screen
+
+    .PARAMETER Version
+
+        Display version information
+
     .EXAMPLE
 
         PS C:\> Invoke-BloodHound
@@ -219,12 +231,14 @@
 
     [CmdletBinding(PositionalBinding=$false)]
     param(
+        [Alias("c")]
         [String[]]
         $CollectionMethod = [string[]] @('Default'),
 
 		[Switch]
         $Stealth,
 
+        [Alias("d")]
         [String]
         $Domain,
 
@@ -332,6 +346,16 @@
         [String]
         $SearchBase
         
+
+        [Switch]
+        $V,
+
+        [Alias("h")]
+        [Switch]
+        $Help,
+
+        [Switch]
+        $Version
     )
 
     $vars = New-Object System.Collections.Generic.List[System.Object]
@@ -493,6 +517,10 @@
 		$vars.Add("--Loop")
 	}
 
+    if ($V){
+        $vars.Add("-v");
+    }
+
 	if ($LoopDuration){
 		$vars.Add("--LoopDuration")
 		$vars.Add($LoopDuration)
@@ -507,6 +535,14 @@
         $vars.Add("--SearchBase")
         $vars.Add($SearchBase)
 	}
+    if ($Help){
+        $vars.Add("--Help");
+    }
+
+    if ($Version){
+        $vars.clear();
+        $vars.Add("--Version");
+    }
 
     $passed = [string[]]$vars.ToArray()
 
