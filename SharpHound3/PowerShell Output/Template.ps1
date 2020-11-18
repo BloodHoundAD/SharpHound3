@@ -284,6 +284,7 @@
         $DomainController,
 
 		[int]
+        [ValidateRange(0,65535)]
         $LdapPort,
 
         [Switch]
