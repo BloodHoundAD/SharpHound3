@@ -2,7 +2,7 @@
 
 ## Get SharpHound
 
-The latest build of SharpHound will always be in the BloodHound repository [here](https://github.com/BloodHoundAD/BloodHound/tree/master/Ingestors)
+The latest build of SharpHound will always be in the BloodHound repository [here](https://github.com/BloodHoundAD/BloodHound/tree/master/Collectors)
 
 ## Compile Instructions
 
