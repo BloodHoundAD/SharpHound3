@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.DirectoryServices.ActiveDirectory;
@@ -219,6 +219,11 @@ namespace SharpHound3
                 var resolved = query.Answers.ARecords().DefaultIfEmpty(null).FirstOrDefault(record => record.Address.AddressFamily == AddressFamily.InterNetwork)?.Address;
                 if (resolved != null)
                     newServerList.Add(new IPEndPoint(resolved, 53));
+
+                var queryv6 = resolver.Query(dnsServer, QueryType.AAAA);
+                var resolvedv6 = query.Answers.AaaaRecords().DefaultIfEmpty(null).FirstOrDefault(record => record.Address.AddressFamily == AddressFamily.InterNetworkV6)?.Address;
+                if (resolvedv6 != null)
+                    newServerList.Add(new IPEndPoint(resolvedv6, 53));
             }
 
             newServerList.AddRange(resolver.NameServers.Select(server => server.Endpoint));
@@ -307,8 +312,10 @@ namespace SharpHound3
         /// <returns></returns>
         private static bool CheckHostPort(string hostname, int port)
         {
-            using (var client = new TcpClient())
+            using (var client = new TcpClient(AddressFamily.InterNetworkV6))
             {
+                client.Client.DualMode = true;
+
                 try
                 {
                     var result = client.BeginConnect(hostname, port, null, null);
