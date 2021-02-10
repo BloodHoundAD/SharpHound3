@@ -18,6 +18,7 @@ namespace SharpHound3
     {
         private readonly string _domainController;
         private readonly string _domainName;
+        private readonly Domain _domain;
         private Dictionary<string, string> _domainGuidMap;
         private bool _isFaulted;
 
@@ -27,6 +28,7 @@ namespace SharpHound3
 
         public DirectorySearch(string domainName = null, string domainController = null)
         {
+            _domain = GetDomain();
             _domainName = Helpers.NormalizeDomainName(domainName);
             baseLdapPath = $"DC={_domainName.Replace(".", ",DC=")}";
             _domainController = Options.Instance.DomainController ?? domainController;
@@ -297,6 +299,27 @@ namespace SharpHound3
         }
 
         /// <summary>
+        /// Gets the domain object associated with the specified domain for this DirectorySearcher
+        /// </summary>
+        /// <returns></returns>
+        private Domain GetDomain()
+        {
+            try
+            {
+                if (_domainName == null)
+                    return Domain.GetCurrentDomain();
+
+                var context = new DirectoryContext(DirectoryContextType.Domain, _domainName);
+                return Domain.GetDomain(context);
+            }
+            catch
+            {
+                _isFaulted = true;
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Gets an LDAPConnection to the Global Catalog
         /// </summary>
         /// <returns></returns>
@@ -367,9 +390,11 @@ namespace SharpHound3
             if (_isFaulted)
                 return;
 
-            Console.WriteLine($"[+] Creating Schema map for domain {_domainName} using path CN=Schema,CN=Configuration,{baseLdapPath}");
+            // AD Schema is defined at forest-level so we use forest DN as LDAP search base
+            var path = _domain.Forest.Schema.Name;
+            Console.WriteLine($"[+] Creating Schema map for domain {_domainName} using path {path}");
 
-            foreach (var result in QueryLdap("(schemaIDGUID=*)", new[] { "schemaidguid", "name" }, SearchScope.Subtree, $"CN=Schema,CN=Configuration,{baseLdapPath}"))
+            foreach (var result in QueryLdap("(schemaIDGUID=*)", new[] { "schemaidguid", "name" }, SearchScope.Subtree, path))
             {
                 var name = result.GetProperty("name");
                 var guid = new Guid(result.GetPropertyAsBytes("schemaidguid")).ToString();
