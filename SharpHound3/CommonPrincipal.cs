@@ -136,6 +136,12 @@ namespace SharpHound3
                 case "S-1-5-20":
                     commonPrincipal = new CommonPrincipal("NT Authority", User);
                     break;
+                case "S-1-5-113":
+                    commonPrincipal = new CommonPrincipal("Local Account", User);
+                    break;
+                case "S-1-5-114":
+                    commonPrincipal = new CommonPrincipal("Local Account and Member of Administrators Group", User);
+                    break;
                 case "S-1-5-80-0":
                     commonPrincipal = new CommonPrincipal("All Services ", Group);
                     break;
