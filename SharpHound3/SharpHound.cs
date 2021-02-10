@@ -233,9 +233,9 @@ namespace SharpHound3
         }
 
         // Accessor function for the PS1 to work, do not change or remove
-        public static async void InvokeSharpHound(string[] args)
+        public static void InvokeSharpHound(string[] args)
         {
-            await Main(args);
+            Main(args).Wait();
         }
     }
 }
