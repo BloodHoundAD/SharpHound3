@@ -142,6 +142,7 @@ namespace SharpHound3.Tasks
             };
 
             everyone.Properties.Add("name", $"EVERYONE@{domainName}");
+            everyone.Properties.Add("domain", domainName);
 
             _groupOutput.Value.WriteObject(everyone);
 
@@ -153,6 +154,7 @@ namespace SharpHound3.Tasks
             };
 
             authUsers.Properties.Add("name", $"AUTHENTICATED USERS@{domainName}");
+            authUsers.Properties.Add("domain", domainName);
 
             _groupOutput.Value.WriteObject(authUsers);
 
