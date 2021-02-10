@@ -479,9 +479,9 @@ namespace SharpHound3
                 if (SidToDomainNameCache.TryGetValue(domainSid, out var domainName))
                     return domainName;
 
-                var domain = await GetDomainNameFromSidLdap(sid);
+                var domain = await GetDomainNameFromSidLdap(domainSid);
 
-                SidToDomainNameCache.TryAdd(sid, domain);
+                SidToDomainNameCache.TryAdd(domainSid, domain);
                 return domain;
             }
             catch
