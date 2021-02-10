@@ -1,4 +1,4 @@
-﻿function Invoke-SharpHound{
+﻿function Invoke-BloodHound{
     <#
     .SYNOPSIS
 
@@ -197,28 +197,28 @@
 
     .EXAMPLE
 
-        PS C:\> Invoke-SharpHound
+        PS C:\> Invoke-BloodHound
 
         Executes the default collection options and exports JSONs to the current directory, compresses the data to a zip file,
         and then removes the JSON files from disk
 
     .EXAMPLE
 
-        PS C:\> Invoke-SharpHound -Loop -LoopInterval 00:01:00 -LoopDuration 00:10:00
+        PS C:\> Invoke-BloodHound -Loop -LoopInterval 00:01:00 -LoopDuration 00:10:00
 
         Executes session collection in a loop. Will wait 1 minute after each run to continue collection
         and will continue running for 10 minutes after which the script will exit
 
     .EXAMPLE
 
-        PS C:\> Invoke-SharpHound -CollectionMethod All
+        PS C:\> Invoke-BloodHound -CollectionMethod All
 
         Runs ACL, ObjectProps, Container, and Default collection methods, compresses the data to a zip file,
         and then removes the JSON files from disk
 
     .EXAMPLE
 
-        PS C:\> Invoke-SharpHound -CollectionMethod DCOnly -NoSaveCache -RandomizeFilenames -EncryptZip
+        PS C:\> Invoke-BloodHound -CollectionMethod DCOnly -NoSaveCache -RandomizeFilenames -EncryptZip
 
         (Opsec!) Run LDAP only collection methods (Groups, Trusts, ObjectProps, ACL, Containers, GPO Admins) without outputting the cache file to disk.
         Randomizes filenames of the JSON files and the zip file and adds a password to the zip file
