@@ -145,7 +145,6 @@ namespace SharpHound3.Tasks
                 // If the string isn't actually a timestamp, a System.FormatException will be thrown
                 try
                 {
-
                     var dt = DateTime.ParseExact(property, "yyyyMMddHHmmss.0K", CultureInfo.CurrentCulture);
                     return (long)dt.Subtract(WindowsEpoch).TotalSeconds;
                 }
