@@ -61,7 +61,7 @@ namespace SharpHound3
         public bool InvalidateCache { get; set; }
 
         [Option(HelpText = "Store JSON files (prior to being zipped) in-memory rather than on-disk")]
-        public bool MemoryOnlyJSONFiles { get; set; }
+        public bool MemoryOnlyJSON { get; set; }
 
         //Connection Options
         [Option(HelpText = "Custom LDAP Filter to append to the search. Use this to filter collection", Default = null)]

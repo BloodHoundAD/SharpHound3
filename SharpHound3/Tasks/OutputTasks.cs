@@ -207,22 +207,22 @@ namespace SharpHound3.Tasks
 
             _runTimer.Stop();
             _statusTimer.Stop();
-            if (_userOutput.IsValueCreated)
-                _userOutput.Value.CloseWriter();
-            if (_computerOutput.IsValueCreated)
-                _computerOutput.Value.CloseWriter();
-            if (_groupOutput.IsValueCreated)
-                _groupOutput.Value.CloseWriter();
-            if (_domainOutput.IsValueCreated)
-                _domainOutput.Value.CloseWriter();
-            if (_gpoOutput.IsValueCreated)
-                _gpoOutput.Value.CloseWriter();
-            if (_ouOutput.IsValueCreated)
-                _ouOutput.Value.CloseWriter();
+
+            // IsValueCreated was used pre-MemoryStream to only write JSON files that has received data
+            // In this case, if there's no data (typically when looping), IsValueCreated==false.
+            // When the MemoryStream approach is used, however, the MemoryStream still has partial data (the starting JSON syntax)
+            // When you try to import will fail due to it being malformed.
+            // Therefore, need to force a close. This will cause all JSON syntax to be formed properly.
+            _userOutput.Value.CloseWriter();
+            _computerOutput.Value.CloseWriter();
+            _groupOutput.Value.CloseWriter();
+            _domainOutput.Value.CloseWriter();
+            _gpoOutput.Value.CloseWriter();
+            _ouOutput.Value.CloseWriter();
 
             // Only reset data tracking if in-memory zipping is not used.  If in-memory zipping is used, the data reset must be performed later. Otherwise the new JsonFileWriter instance clears the data in the MemoryStream
             // In the case of in-memory zipping raise mutexes
-            if (options.MemoryOnlyJSONFiles == false)
+            if (options.MemoryOnlyJSON == false)
             {
                 ResetTracking();
             }
@@ -241,7 +241,7 @@ namespace SharpHound3.Tasks
 
             var buffer = new byte[4096];
 
-            if (File.Exists(finalName) && !options.MemoryOnlyJSONFiles)
+            if (File.Exists(finalName) && !options.MemoryOnlyJSON)
             {
                 Console.WriteLine("Zip File already exists, randomizing filename");
                 finalName = Helpers.ResolveFileName(Path.GetRandomFileName(), "zip", true);
@@ -250,7 +250,7 @@ namespace SharpHound3.Tasks
 
             ZipOutputStream zipStream;
             MemoryStream zipOutputMemoryStream = new MemoryStream();
-            if (options.MemoryOnlyJSONFiles)
+            if (options.MemoryOnlyJSON)
             {
                 zipStream = new ZipOutputStream(zipOutputMemoryStream);
             }
@@ -277,7 +277,7 @@ namespace SharpHound3.Tasks
                 Console.WriteLine("You can upload this file directly to the UI");
             }
 
-            if (options.MemoryOnlyJSONFiles)
+            if (options.MemoryOnlyJSON)
             {
                 AddRecordToZipInMemory(ref zipStream, ref _userOutput);
                 AddRecordToZipInMemory(ref zipStream, ref _groupOutput);
@@ -321,7 +321,7 @@ namespace SharpHound3.Tasks
             zipStream.Finish();
             zipStream.Close();
 
-            if (options.MemoryOnlyJSONFiles)
+            if (options.MemoryOnlyJSON)
             {
                 // Close manually as it was left open for in-memory zipping when JsonTextWriter was created. Should be auto-cleaned by GC, but close for certainty.
                 _userOutput.Value.jsonMemoryStream.Close();
@@ -543,7 +543,7 @@ namespace SharpHound3.Tasks
                 }
 
                 StreamWriter writer;
-                if (Options.Instance.MemoryOnlyJSONFiles)
+                if (Options.Instance.MemoryOnlyJSON)
                 {
                     writer = new StreamWriter(jsonMemoryStreamRef, Encoding.UTF8);
                 }
@@ -560,7 +560,7 @@ namespace SharpHound3.Tasks
                 jsonWriter.WritePropertyName(baseName);
                 jsonWriter.WriteStartArray();
 
-                if (Options.Instance.MemoryOnlyJSONFiles)
+                if (Options.Instance.MemoryOnlyJSON)
                 {
                     // Don't close output (MemoryStream) for when CloseWriter()->Close() is called as it's needed to perform the in-memory zipping 
                     // CloseWriter()->Close() must be called though to ensure valid JSON
