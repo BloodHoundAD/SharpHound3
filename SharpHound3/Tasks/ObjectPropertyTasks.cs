@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 using SharpHound3.Enums;
 using SharpHound3.JSON;
 using SharpHound3.LdapWrappers;
+using System.IO;
+using System.Text.RegularExpressions;
+using LdapGroup = SharpHound3.LdapWrappers.Group;
 
 namespace SharpHound3.Tasks
 {
@@ -58,7 +61,7 @@ namespace SharpHound3.Tasks
             {
                 ParseOUProperties(ou);
             }
-            else if (wrapper is Group group)
+            else if (wrapper is LdapGroup group)
             {
                 ParseGroupProperties(group);
             }
@@ -183,6 +186,27 @@ namespace SharpHound3.Tasks
         {
             var result = wrapper.SearchResult;
 
+            // Look for LmCompatibilityLevel. LmCompatibilityLevel < 3 means NTLMv1 authentication
+            var gpoDomain = Helpers.DistinguishedNameToDomain(wrapper.DistinguishedName);
+            Regex NTLMv1Regex = new Regex(@"\\LmCompatibilityLevel=\d,(\d)", RegexOptions.Compiled | RegexOptions.Singleline);
+            var templatePath = $"{result.GetProperty("gpcfilesyspath")}\\MACHINE\\Microsoft\\Windows NT\\SecEdit\\GptTmpl.inf";
+            //Check the file exists
+            if (File.Exists(templatePath))
+            {
+                using (var reader = new StreamReader(new FileStream(templatePath, FileMode.Open, FileAccess.Read)))
+                {
+                    //Read the file, and read it to the end
+                    var content = reader.ReadToEnd();
+                    var NTLMv1Match = NTLMv1Regex.Match(content);
+
+                    if (NTLMv1Match.Success)
+                    {
+                        int value = int.Parse(NTLMv1Match.Groups[1].Value);
+                        // LmCompatibilityLevel < 3 means NTLMv1 will be used by the target when authenticating
+                        wrapper.Properties.Add("ntlmv1", value < 3);
+                    }
+                }
+            }
             wrapper.Properties.Add("gpcpath", result.GetProperty("gpcfilesyspath"));
         }
 
@@ -422,6 +446,7 @@ namespace SharpHound3.Tasks
             wrapper.HasSIDHistory = sidHistoryPrincipals.ToArray();
             wrapper.Properties.Add("sidhistory", sidHistoryList.ToArray());
         }
+
 
         /// <summary>
         /// Converts a windows timestamp into unix epoch time
