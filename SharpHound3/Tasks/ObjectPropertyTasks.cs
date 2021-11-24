@@ -188,7 +188,7 @@ namespace SharpHound3.Tasks
 
             // Look for LmCompatibilityLevel. LmCompatibilityLevel < 3 means NTLMv1 authentication
             var gpoDomain = Helpers.DistinguishedNameToDomain(wrapper.DistinguishedName);
-            Regex NTLMv1Regex = new Regex(@"\\LmCompatibilityLevel=\d,(\d)", RegexOptions.Compiled | RegexOptions.Singleline);
+            Regex NTLMv1Regex = new Regex(@"\\LmCompatibilityLevel *= *\d+ *, *(\d)", RegexOptions.Compiled | RegexOptions.Singleline);
             var templatePath = $"{result.GetProperty("gpcfilesyspath")}\\MACHINE\\Microsoft\\Windows NT\\SecEdit\\GptTmpl.inf";
             //Check the file exists
             if (File.Exists(templatePath))
