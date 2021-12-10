@@ -30,7 +30,7 @@ namespace SharpHound3
         [Option(HelpText = "Don't output data from this run. Used for debugging purposes", Hidden = true)]
         public bool NoOutput { get; set; }
 
-        [Option(HelpText = "Folder to output files too", Default = ".")]
+        [Option(HelpText = "Folder to output files to", Default = ".")]
         public string OutputDirectory { get; set; }
 
         [Option(HelpText = "Prefix for output files", Default = null)]
@@ -64,7 +64,7 @@ namespace SharpHound3
         [Option(HelpText = "Custom LDAP Filter to append to the search. Use this to filter collection", Default = null)]
         public string LdapFilter { get; set; }
 
-        [Option(HelpText = "Domain Controller to connect too. Specifying this value can result in data loss", Default = null)]
+        [Option(HelpText = "Domain Controller to connect to. Specifying this value can result in data loss", Default = null)]
         public string DomainController { get; set; }
 
         [Option(HelpText = "Port LDAP is running on. Defaults to 389/636 for LDAPS", Default = 0)]
