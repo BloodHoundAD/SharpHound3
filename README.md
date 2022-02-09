@@ -1,3 +1,5 @@
+# THIS IS NOW DEPRECATED IN FAVOR OF [SHARPHOUND](https://github.com/BloodHoundAD/SharpHound). DATA COLLECTED USING THIS METHOD WILL NOT WORK WITH BLOODHOUND 4.1+
+
 # SharpHound - C# Rewrite of the BloodHound Ingestor
 
 ## Get SharpHound
