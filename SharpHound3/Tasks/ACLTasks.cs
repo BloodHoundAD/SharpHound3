@@ -310,6 +310,25 @@ namespace SharpHound3.Tasks
                     }
                 }
 
+                if (rights.HasFlag(ActiveDirectoryRights.Self))
+                { 
+                    if (wrapper is Group)
+                    {
+                        if (objectAceType == "bf9679c0-0de6-11d0-a285-00aa003049e2")
+                        {
+                            aces.Add(new ACL
+                            {
+                                AceType = "AddSelf",
+                                RightName = "WriteProperty",
+                                PrincipalSID = finalSid,
+                                PrincipalType = type,
+                                IsInherited = isInherited
+                            }) ;
+                        }
+                    }
+
+                }
+
                 //PropertyWrites apply to Groups, User, Computer, GPO
                 //GenericWrite encapsulates WriteProperty, so we need to check them at the same time to avoid duplicate edges
                 if (rights.HasFlag(ActiveDirectoryRights.GenericWrite) ||
