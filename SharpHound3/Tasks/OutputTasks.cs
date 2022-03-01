@@ -202,30 +202,30 @@ namespace SharpHound3.Tasks
                 }
             }
 
-            _runTimer.Stop();
-            _statusTimer.Stop();
-            if (_userOutput.IsValueCreated)
-                _userOutput.Value.CloseWriter();
-            if (_computerOutput.IsValueCreated)
-                _computerOutput.Value.CloseWriter();
-            if (_groupOutput.IsValueCreated)
-                _groupOutput.Value.CloseWriter();
-            if (_domainOutput.IsValueCreated)
-                _domainOutput.Value.CloseWriter();
-            if (_gpoOutput.IsValueCreated)
-                _gpoOutput.Value.CloseWriter();
-            if (_ouOutput.IsValueCreated)
-                _ouOutput.Value.CloseWriter();
-
-            _userOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
-            _groupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
-            _computerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
-            _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
-            _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
-            _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
-
             string finalName;
             var options = Options.Instance;
+
+            _runTimer.Stop();
+            _statusTimer.Stop();
+
+            // IsValueCreated was used pre-MemoryStream to only write JSON files that has received data
+            // In this case, if there's no data (typically when looping), IsValueCreated==false.
+            // When the MemoryStream approach is used, however, the MemoryStream still has partial data (the starting JSON syntax)
+            // When you try to import will fail due to it being malformed.
+            // Therefore, need to force a close. This will cause all JSON syntax to be formed properly.
+            _userOutput.Value.CloseWriter();
+            _computerOutput.Value.CloseWriter();
+            _groupOutput.Value.CloseWriter();
+            _domainOutput.Value.CloseWriter();
+            _gpoOutput.Value.CloseWriter();
+            _ouOutput.Value.CloseWriter();
+
+            // Only reset data tracking if in-memory zipping is not used.  If in-memory zipping is used, the data reset must be performed later. Otherwise the new JsonFileWriter instance clears the data in the MemoryStream
+            // In the case of in-memory zipping raise mutexes
+            if (options.MemoryOnlyJSON == false)
+            {
+                ResetTracking();
+            }
 
             if (options.NoZip || options.NoOutput)
                 return;
@@ -241,33 +241,64 @@ namespace SharpHound3.Tasks
 
             var buffer = new byte[4096];
 
-            if (File.Exists(finalName))
+            if (File.Exists(finalName) && !options.MemoryOnlyJSON)
             {
                 Console.WriteLine("Zip File already exists, randomizing filename");
                 finalName = Helpers.ResolveFileName(Path.GetRandomFileName(), "zip", true);
                 Console.WriteLine($"New filename is {finalName}");
             }
 
-            using (var zipStream = new ZipOutputStream(File.Create(finalName)))
+            ZipOutputStream zipStream;
+            MemoryStream zipOutputMemoryStream = new MemoryStream();
+            if (options.MemoryOnlyJSON)
             {
-                //Set level to 9, maximum compressions
-                zipStream.SetLevel(9);
+                zipStream = new ZipOutputStream(zipOutputMemoryStream);
+            }
+            else
+            {
+                zipStream = new ZipOutputStream(File.Create(finalName));
+            }
 
-                if (options.EncryptZip)
+            //Set level to 9, maximum compressions
+            zipStream.SetLevel(9);
+
+            if (options.EncryptZip)
+            {
+                if (!options.Loop)
                 {
-                    if (!options.Loop)
-                    {
-                        var password = ZipPasswords.Value;
-                        zipStream.Password = password;
+                    var password = ZipPasswords.Value;
+                    zipStream.Password = password;
 
-                        Console.WriteLine($"Password for Zip file is {password}. Unzip files manually to upload to interface");
-                    }
+                    Console.WriteLine($"Password for Zip file is {password}. Unzip files manually to upload to interface");
                 }
-                else
+            }
+            else
+            {
+                Console.WriteLine("You can upload this file directly to the UI");
+            }
+
+            if (options.MemoryOnlyJSON)
+            {
+                AddRecordToZipInMemory(ref zipStream, ref _userOutput);
+                AddRecordToZipInMemory(ref zipStream, ref _groupOutput);
+                AddRecordToZipInMemory(ref zipStream, ref _computerOutput);
+                AddRecordToZipInMemory(ref zipStream, ref _domainOutput);
+                AddRecordToZipInMemory(ref zipStream, ref _gpoOutput);
+                AddRecordToZipInMemory(ref zipStream, ref _ouOutput);
+
+                zipStream.IsStreamOwner = false;
+                zipStream.Close();
+                zipOutputMemoryStream.Position = 0;
+
+                using (FileStream file = new FileStream(finalName, FileMode.Create, System.IO.FileAccess.Write))
                 {
-                    Console.WriteLine("You can upload this file directly to the UI");
+                    zipOutputMemoryStream.WriteTo(file);
                 }
 
+                zipOutputMemoryStream.Close();
+            }
+            else
+            {
                 foreach (var file in UsedFileNames)
                 {
                     var entry = new ZipEntry(Path.GetFileName(file)) { DateTime = DateTime.Now };
@@ -285,14 +316,38 @@ namespace SharpHound3.Tasks
 
                     File.Delete(file);
                 }
+            }
 
-                zipStream.Finish();
+            zipStream.Finish();
+            zipStream.Close();
+
+            if (options.MemoryOnlyJSON)
+            {
+                // Close manually as it was left open for in-memory zipping when JsonTextWriter was created. Should be auto-cleaned by GC, but close for certainty.
+                _userOutput.Value.jsonMemoryStream.Close();
+                _groupOutput.Value.jsonMemoryStream.Close();
+                _computerOutput.Value.jsonMemoryStream.Close();
+                _domainOutput.Value.jsonMemoryStream.Close();
+                _gpoOutput.Value.jsonMemoryStream.Close();
+                _ouOutput.Value.jsonMemoryStream.Close();
+
+                ResetTracking();
             }
 
             if (options.Loop)
                 ZipFileNames.Add(finalName);
 
             UsedFileNames.Clear();
+        }
+
+        internal static void ResetTracking()
+        {
+            _userOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("users"), false);
+            _groupOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("groups"), false);
+            _computerOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("computers"), false);
+            _domainOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("domains"), false);
+            _gpoOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("gpos"), false);
+            _ouOutput = new Lazy<JsonFileWriter>(() => new JsonFileWriter("ous"), false);
         }
 
         internal static async Task CollapseLoopZipFiles()
@@ -350,6 +405,20 @@ namespace SharpHound3.Tasks
 
                 zipStream.Finish();
             }
+        }
+
+        private static void AddRecordToZipInMemory(ref ZipOutputStream zipStream, ref Lazy<JsonFileWriter> record)
+        {
+            string filename = Path.GetRandomFileName().ToString();
+
+            var newEntry = new ZipEntry(filename);
+            newEntry.DateTime = DateTime.Now;
+            zipStream.PutNextEntry(newEntry);
+
+            record.Value.jsonMemoryStream.Seek(0, SeekOrigin.Begin);
+            ICSharpCode.SharpZipLib.Core.StreamUtils.Copy(record.Value.jsonMemoryStream, zipStream, new byte[4096]);
+
+            zipStream.CloseEntry();
         }
 
         private static string GenerateZipPassword()
@@ -421,6 +490,8 @@ namespace SharpHound3.Tasks
         {
             private int Count { get; set; }
             private JsonTextWriter JsonWriter { get; }
+            public MemoryStream jsonMemoryStream = new MemoryStream();
+            public StreamWriter streamWriter { get; set; }
 
             private readonly string _baseFileName;
 
@@ -432,7 +503,7 @@ namespace SharpHound3.Tasks
             internal JsonFileWriter(string baseFilename)
             {
                 Count = 0;
-                JsonWriter = CreateFile(baseFilename);
+                JsonWriter = CreateFile(baseFilename, ref jsonMemoryStream);
                 _baseFileName = baseFilename;
             }
 
@@ -460,7 +531,7 @@ namespace SharpHound3.Tasks
                     JsonWriter.Flush();
             }
 
-            private static JsonTextWriter CreateFile(string baseName)
+            private static JsonTextWriter CreateFile(string baseName, ref MemoryStream jsonMemoryStreamRef)
             {
                 var filename = Helpers.ResolveFileName(baseName, "json", true);
                 UsedFileNames.Add(filename);
@@ -471,13 +542,30 @@ namespace SharpHound3.Tasks
                     throw new FileExistsException($"File {filename} already exists. This should never happen!");
                 }
 
-                var writer = new StreamWriter(filename, false, Encoding.UTF8);
+                StreamWriter writer;
+                if (Options.Instance.MemoryOnlyJSON)
+                {
+                    writer = new StreamWriter(jsonMemoryStreamRef, Encoding.UTF8);
+                }
+                else
+                {
+                    writer = new StreamWriter(filename, false, Encoding.UTF8);
+                }
+                writer.AutoFlush = true;
+
                 var jsonFormat = Options.Instance.PrettyJson ? Formatting.Indented : Formatting.None;
 
                 var jsonWriter = new JsonTextWriter(writer) { Formatting = jsonFormat };
                 jsonWriter.WriteStartObject();
                 jsonWriter.WritePropertyName(baseName);
                 jsonWriter.WriteStartArray();
+
+                if (Options.Instance.MemoryOnlyJSON)
+                {
+                    // Don't close output (MemoryStream) for when CloseWriter()->Close() is called as it's needed to perform the in-memory zipping 
+                    // CloseWriter()->Close() must be called though to ensure valid JSON
+                    jsonWriter.CloseOutput = false;
+                }
 
                 return jsonWriter;
             }
