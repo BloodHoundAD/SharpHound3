@@ -142,8 +142,17 @@ namespace SharpHound3.Tasks
             //A string ending with 0Z is likely a timestamp
             if (property.EndsWith("0Z"))
             {
-                var dt = DateTime.ParseExact(property, "yyyyMMddHHmmss.0K", CultureInfo.CurrentCulture);
-                return (long)dt.Subtract(WindowsEpoch).TotalSeconds;
+                // If the string isn't actually a timestamp, a System.FormatException will be thrown
+                try
+                {
+                    var dt = DateTime.ParseExact(property, "yyyyMMddHHmmss.0K", CultureInfo.CurrentCulture);
+                    return (long)dt.Subtract(WindowsEpoch).TotalSeconds;
+                }
+                catch
+                {
+                    // Not a valid timestamp
+                    return property;
+                }
             }
 
             //This string corresponds to the max int, and is usually set in accountexpires
