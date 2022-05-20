@@ -351,6 +351,10 @@ namespace SharpHound3.Tasks
                 passwdNotReq = (uacFlags & UacFlags.PasswordNotRequired) != 0;
                 unconstrained = (uacFlags & UacFlags.TrustedForDelegation) != 0;
                 pwdNeverExires = (uacFlags & UacFlags.DontExpirePassword) != 0;
+
+                // Adding the raw UAC flags for extensibility
+                // Can be used in queries via the apoc.bitwise.op functions
+                wrapper.Properties.Add("uac", baseFlags);
             }
 
             wrapper.Properties.Add("dontreqpreauth", dontReqPreAuth);
