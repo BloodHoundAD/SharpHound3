@@ -87,7 +87,7 @@ namespace SharpHound3
             {
                 //ldapFilterParts.Add("(&(&(objectcategory=groupPolicyContainer)(flags=*))(name=*)(gpcfilesyspath=*))");
                 //ldapProperties.AddRange(new[] {"gpcfilesyspath", "displayname"});
-                ldapFilterParts.Add("(&(|(objectcategory=organizationalUnit)(objectclass=domain))(gplink=*)(flags=*))");
+                ldapFilterParts.Add("(&(|(objectcategory=organizationalUnit)(objectclass=domain))(gplink=*))");
                 ldapProperties.AddRange(new[] { "gplink", "name" });
             }
 
