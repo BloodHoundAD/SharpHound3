@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.DirectoryServices.Protocols;
 using System.Linq;
@@ -566,7 +566,9 @@ namespace SharpHound3
         private static bool RequestNetbiosNameFromComputer(string server, string domain, out string netbios)
         {
             var receiveBuffer = new byte[1024];
-            var requestSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            var requestSocket = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
+            requestSocket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
+
             try
             {
                 //Set receive timeout to 1 second
@@ -584,7 +586,8 @@ namespace SharpHound3
                         if (server.Contains("."))
                         {
                             address = Dns
-                                .GetHostAddresses(server).First(x => x.AddressFamily == AddressFamily.InterNetwork);
+                                .GetHostAddresses(server)
+                                .First(x => x.AddressFamily == AddressFamily.InterNetwork || x.AddressFamily == AddressFamily.InterNetworkV6);
                         }
                         else
                         {
@@ -608,7 +611,7 @@ namespace SharpHound3
                     }
                 }
 
-                var originEndpoint = new IPEndPoint(IPAddress.Any, 0);
+                var originEndpoint = new IPEndPoint(IPAddress.IPv6Any, 0);
                 requestSocket.Bind(originEndpoint);
 
                 try
